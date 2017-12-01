@@ -13,67 +13,81 @@ class WidthOptimizer:
         self.__dict__.update(**kwargs)
 
     def compute_covariance_matrix(self, layer):
-            intermediate_layer_model = Model(inputs=self.model.input,
-                                        outputs=layer.output)
-            batch = self.x_train[:100]
-            sigma = np.zeros(batch[0].shape)
-            output = intermediate_layer_model.predict(batch)
-            print(output.shape)
-            n = len(batch)
-            for i in range(n):
-                import pdb; pdb.set_trace()  # XXX BREAKPOINT
-                sigma += np.outer(output[i], output[i])
-            sigma = 1/(n-1) * sigma
-            return sigma
+        intermediate_layer_model = Model(inputs=self.model.input,
+                                    outputs=layer.output)
+        batch = self.x_train[:100]
+        output = intermediate_layer_model.predict(batch)
+        sigma = np.zeros((output[0].shape[0], output[0].shape[0]))
+        # print(output.shape)
+        n = len(batch)
+        for i in range(n):
+            sigma += np.outer(output[i], output[i])
+        sigma = 1/(n-1) * sigma
+        return sigma
+
+    def plot_eigen(self, eigen_values):
+        print(eigen_values)
+
+        plt.loglog(eigen_values)
+        plt.title("Eigen values")
+        plt.show()
+
+    def plot_degree_of_freedom(self):
+        X = np.linspace(0, 10)
+        Y = [self.degree_of_freedom(l) for l in X]
+        plt.plot(X, Y)
+        plt.title("Degree of freedom N(\lambda)")
+        plt.show()
 
     def compress(self, method="greedy"):
         # Compress each layer
         for n, layer in enumerate(self.model.layers):
             print("Compressing layer %d" % n)
-            weights = layer.get_weights() # list of numpy arrays
+            weights = layer.get_weights()[0] # list of numpy arrays
 
             sigma = self.compute_covariance_matrix(layer)
 
             eigen_values, eigen_vectors = np.linalg.eig(sigma)
             eigen_values.sort()
-            # print(eigen_values)
-            # plt.loglog(eigen_values)
-            # plt.show()
-            degree_of_freedom = lambda l: sum([my/(my+l) for my in eigen_values])
-            l = 0.6
-            m_l = degree_of_freedom(l)
 
+            self.degree_of_freedom = lambda l: sum([my/(my+l) for my in eigen_values])
+
+            # self.plot_eigen(eigen_values)
+
+            l = 0.6
+            m_l = self.degree_of_freedom(l)
             if method == "greedy":
                 neurons = self._greedy(sigma)
+
                 print(f'Degree of freedom {m_l} and compressed size {len(neurons)}')
                 print(f'Compressed layer {neurons}')
 
                 # Update weights
-                adjusted_weights = weights[neurons]
+                adjusted_weights = weights[:, neurons]
                 # TODO W=A*W
-                layer.set_weights(adjusted_weights)
+
+                layer.set_weights([adjusted_weights])
             else:
                 A = self._group_sparse(sigma)
 
-                adjusted_weights = weights @ A
+                adjusted_weights = A @ weights
 
     def _greedy(self, cov):
         constraint = []
-        # print(cov.shape[0])
         possible = np.arange(cov.shape[0])
         neurons = []
         steps = 0
         while len(neurons) < len(possible):
-            # Make greedy choice
             best_choice = 1e100
             best_index = None
             for j in possible:
                 if j in neurons:
                     continue
-                reduced_cov = cov[neurons]
-                # print(reduced_cov)
+
+                n_p_j = neurons + [j]
+                reduced_cov = cov[np.ix_(n_p_j, n_p_j)]
                 residual = -np.trace(reduced_cov)
-                # print(residual)
+
                 if residual < best_choice:
                     best_choice = residual
                     best_index = j
@@ -96,7 +110,7 @@ class WidthOptimizer:
         plt.plot(constraint)
         plt.title("Model difference")
         plt.show()
-
+        neurons.sort()
         return neurons
 
     def _group_sparse(self, cov, weights):
