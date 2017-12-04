@@ -5,20 +5,15 @@ import matplotlib.pyplot as plt
 
 class WidthOptimizer:
 
-    def __init__(self, model,**kwargs):
-        self.model = model
-
-        self.nth_layer_function = lambda n: K.function([model.layers[0].input],
-                                  [model.layers[n].output])
+    def __init__(self, **kwargs):
+        self.plot = False
         self.__dict__.update(**kwargs)
 
-    def compute_covariance_matrix(self, layer):
-        intermediate_layer_model = Model(inputs=self.model.input,
+    def compute_covariance_matrix(self, model, layer, batch):
+        intermediate_layer_model = Model(inputs=model.input,
                                     outputs=layer.output)
-        batch = self.x_train[:100]
         output = intermediate_layer_model.predict(batch)
         sigma = np.zeros((output[0].shape[0], output[0].shape[0]))
-        # print(output.shape)
         n = len(batch)
         for i in range(n):
             sigma += np.outer(output[i], output[i])
@@ -39,13 +34,16 @@ class WidthOptimizer:
         plt.title("Degree of freedom N(\lambda)")
         plt.show()
 
-    def compress(self, method="greedy"):
-        # Compress each layer
-        for n, layer in enumerate(self.model.layers):
-            print("Compressing layer %d - %s" % (n, str(layer.__class__)))
-            weights, biases = layer.get_weights() # list of numpy arrays
+    def compress(self, model, alpha=0.01, method="greedy", x_train=None,
+                 y_train=None):
+        self.nth_layer_function = lambda n: K.function([model.layers[0].input],
+                                  [model.layers[n].output])
 
-            sigma = self.compute_covariance_matrix(layer)
+        for n, layer in enumerate(model.layers):
+            print("Compressing layer %d - %s" % (n, str(layer.__class__)))
+            weights, biases = layer.get_weights()
+
+            sigma = self.compute_covariance_matrix(model, layer, x_train[:100])
 
             eigen_values, eigen_vectors = np.linalg.eig(sigma)
             eigen_values = eigen_values[eigen_values != 0]
@@ -53,28 +51,27 @@ class WidthOptimizer:
 
             self.degree_of_freedom = lambda l: sum([my/(my+l) for my in eigen_values])
 
-            # self.plot_eigen(eigen_values)
+            if self.plot:
+                self.plot_eigen(eigen_values)
 
             l = 0.6
             m_l = self.degree_of_freedom(l)
             if method == "greedy":
-                neurons, excluded = self._greedy(sigma)
+                neurons, excluded = self._greedy(sigma, alpha)
 
                 print('Degree of freedom %f and compressed size %d' % (m_l, len(neurons)))
                 print('Compressed layer', neurons)
 
-                # Update weights
                 weights[:, excluded] = 0
                 biases[excluded] = 0
                 # TODO W=A*W
-                # compressed_layer =
                 layer.set_weights([weights, biases])
             else:
                 A = self._group_sparse(sigma)
 
                 adjusted_weights = A.dot(weights)
 
-    def _greedy(self, cov):
+    def _greedy(self, cov, alpha):
         constraint = []
         possible = np.arange(cov.shape[0])
         neurons = []
@@ -101,7 +98,7 @@ class WidthOptimizer:
 
             model_difference = np.trace(cov) + best_choice
             constraint.append(model_difference)
-            if model_difference <= self.alpha:
+            if model_difference <= alpha:
                 print('Finished after %d - %f' % (steps, model_difference))
                 break
 
@@ -109,9 +106,11 @@ class WidthOptimizer:
                 print('Step %d - %f' % (steps, model_difference))
             steps += 1
 
-        plt.plot(constraint)
-        plt.title("Model difference")
-        plt.show()
+        if self.plot:
+            plt.plot(constraint)
+            plt.title("Model difference")
+            plt.show()
+
         neurons.sort()
         return neurons, list(set(possible).difference(neurons))
 

@@ -33,5 +33,4 @@ else:
     model.save(model_path)
     print('Saved trained model at %s ' % model_path)
 
-# print(model.predict(training_data).round())
 
