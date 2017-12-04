@@ -48,6 +48,7 @@ class WidthOptimizer:
             sigma = self.compute_covariance_matrix(layer)
 
             eigen_values, eigen_vectors = np.linalg.eig(sigma)
+            eigen_values = eigen_values[eigen_values != 0]
             eigen_values.sort()
 
             self.degree_of_freedom = lambda l: sum([my/(my+l) for my in eigen_values])
@@ -57,17 +58,17 @@ class WidthOptimizer:
             l = 0.6
             m_l = self.degree_of_freedom(l)
             if method == "greedy":
-                neurons = self._greedy(sigma)
+                neurons, excluded = self._greedy(sigma)
 
                 print('Degree of freedom %f and compressed size %d' % (m_l, len(neurons)))
                 print('Compressed layer', neurons)
 
                 # Update weights
-                adjusted_weights = weights[:, neurons]
-                adjusted_biases = biases[neurons]
+                weights[:, excluded] = 0
+                biases[excluded] = 0
                 # TODO W=A*W
                 # compressed_layer =
-                layer.set_weights([adjusted_weights, adjusted_biases])
+                layer.set_weights([weights, biases])
             else:
                 A = self._group_sparse(sigma)
 
@@ -112,7 +113,7 @@ class WidthOptimizer:
         plt.title("Model difference")
         plt.show()
         neurons.sort()
-        return neurons
+        return neurons, list(set(possible).difference(neurons))
 
     def _group_sparse(self, cov, weights):
         # min tr(ASA^T - 2AS) + lambda * sum(norm(A[:, j]))
