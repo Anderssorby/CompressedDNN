@@ -42,8 +42,8 @@ class WidthOptimizer:
     def compress(self, method="greedy"):
         # Compress each layer
         for n, layer in enumerate(self.model.layers):
-            print("Compressing layer %d" % n)
-            weights = layer.get_weights()[0] # list of numpy arrays
+            print("Compressing layer %d - %s" % (n, str(layer.__class__)))
+            weights, biases = layer.get_weights() # list of numpy arrays
 
             sigma = self.compute_covariance_matrix(layer)
 
@@ -59,18 +59,19 @@ class WidthOptimizer:
             if method == "greedy":
                 neurons = self._greedy(sigma)
 
-                print(f'Degree of freedom {m_l} and compressed size {len(neurons)}')
-                print(f'Compressed layer {neurons}')
+                print('Degree of freedom %f and compressed size %d' % (m_l, len(neurons)))
+                print('Compressed layer', neurons)
 
                 # Update weights
                 adjusted_weights = weights[:, neurons]
+                adjusted_biases = biases[neurons]
                 # TODO W=A*W
-
-                layer.set_weights([adjusted_weights])
+                # compressed_layer =
+                layer.set_weights([adjusted_weights, adjusted_biases])
             else:
                 A = self._group_sparse(sigma)
 
-                adjusted_weights = A @ weights
+                adjusted_weights = A.dot(weights)
 
     def _greedy(self, cov):
         constraint = []
@@ -100,11 +101,11 @@ class WidthOptimizer:
             model_difference = np.trace(cov) + best_choice
             constraint.append(model_difference)
             if model_difference <= self.alpha:
-                print(f'Finished after {steps} - {model_difference}')
+                print('Finished after %d - %f' % (steps, model_difference))
                 break
 
             if steps % 10 == 0:
-                print(f'{steps} - {model_difference}')
+                print('Step %d - %f' % (steps, model_difference))
             steps += 1
 
         plt.plot(constraint)
@@ -136,6 +137,18 @@ class WidthOptimizer:
             steps += 1
 
         return A
+
+    def generalization_error(self, lmb):
+
+        layer_widths = []
+        lmbs = []
+        bias = np.square(np.sum(np.sqrt(lmbs)))
+        variance = 0
+        for l in range(layer_widths-1):
+            variance += layer_widths[l]*layer_widths[l+1]
+        variance *= np.log(n)/n
+
+        return bias + variance
 
 
 
