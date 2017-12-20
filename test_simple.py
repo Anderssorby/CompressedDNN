@@ -1,4 +1,4 @@
-from compress import WidthOptimizer
+from compress import WidthOptimizer, LambdaOptimizer
 import keras
 import argparse
 from models import load_model
@@ -11,9 +11,12 @@ ap.add_argument("-m", "--model", required=False,
                 default="keras_xor", help="model to compress")
 args = vars(ap.parse_args())
 
-
-
 model, training_data, target_data = load_model(args["model"])
+
+print("Optimizing theoretical layer width")
+lambda_optimizer = LambdaOptimizer(model=model, x_train=training_data)
+lambdas = lambda_optimizer.optimize()
+print("Lambdas =", lambdas)
 
 n = 10
 alphas = np.linspace(0.01, 0.1, num=n)
@@ -27,7 +30,7 @@ fine_tuned_loss = np.zeros(n)
 for i, alpha in enumerate(alphas):
     print("alpha =", alpha)
 
-    optimizer = WidthOptimizer(lmb=0.8, plot=False)
+    optimizer = WidthOptimizer(theoretical_widths=lambdas, lmb=0.8, plot=True)
 
     compressed_model = keras.models.clone_model(model)
     optimizer.compress(compressed_model, x_train=training_data, y_train=target_data, alpha=0.01, method="greedy")
@@ -47,6 +50,7 @@ plt.figure()
 plt.plot(alphas, np.repeat(initial_loss, n))
 plt.plot(alphas, compressed_loss)
 plt.plot(alphas, fine_tuned_loss)
+plt.xlabel("Alpha")
 plt.legend(["initial loss", "compressed loss", "fine tuned loss"])
 plt.show()
 
