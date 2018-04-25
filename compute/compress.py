@@ -1,9 +1,14 @@
-import keras.backend as K
 from keras.models import Model
-from keras.layers import Dense
 import numpy as np
+from scipy.sparse import lil_matrix, csr_matrix
 import matplotlib.pyplot as plt
 import scipy.optimize as opt
+import os
+import logging
+import tensorflow as tf
+from compute.tf import TensorflowWrapper
+
+accepted_layers = ['Dense', 'Conv2D', 'Conv1D']
 
 
 def compute_covariance_matrix(model, layer, batch):
@@ -11,21 +16,20 @@ def compute_covariance_matrix(model, layer, batch):
                                      outputs=layer.output)
     output = intermediate_layer_model.predict(batch)
     flat_shape = output[0].flatten().shape[0]
-    # TODO handle
-    sigma = np.zeros((flat_shape, flat_shape))
+    sigma = lil_matrix((flat_shape, flat_shape))
     n = len(batch)
     for i in range(n):
         g = output[i].flatten()
         sigma += np.outer(g, g)
     sigma = 1 / (n - 1) * sigma
-    return sigma
+    return csr_matrix.todense(sigma)
 
 
 def generalization_error(lambs, n):
     layer_widths = []
     bias = np.square(np.sum(np.sqrt(lambs)))
     variance = 0
-    for l in range(layer_widths - 1):
+    for l in range(len(lambs) - 1):
         variance += layer_widths[l] * layer_widths[l + 1]
     variance *= np.log(n) / n
 
@@ -40,26 +44,59 @@ def plot_eigen_values(eigen_values):
 
 
 class LambdaOptimizer:
-    def __init__(self, model, x_train):
+
+    def __init__(self, model):
         self.model = model
         self.eigen_values = []
         self.covariance_matrices = []
         self.num_layers = len(model.layers)
         self.initial_widths = np.empty(self.num_layers)
 
-        for n, layer in enumerate(model.layers):
-            if layer.__class__ != Dense:
-                print("Skipping...", layer)
+    def compute_or_load(self, file_prefix, x_train):
+        path = os.path.join(self.saving_dir, self.model.model_name)
+        if not os.path.isdir(path):
+            os.makedirs(path)
+        file_start = os.path.join(path, file_prefix)
+        saver = tf.train.Saver()
+        for n, layer in enumerate(self.model.layers):
+            if layer.__class__.__name__ not in accepted_layers:
+                logging.info("Skipping...", layer)
                 continue
-            sigma = compute_covariance_matrix(model, layer, x_train[:100])
+            save_path = file_start + ".%d.ckpt" % n
+            with tf.Session() as session:
+                sigma_file = file_start + ".cov.%d.ckpt" % n
+                if not os.path.isfile(sigma_file):
+                    session = tf.Session()
+                    sigma = TensorflowWrapper.compute_covariance_matrix_with_tf(self.model, layer, x_train[:100])
+                    session.run(sigma)
+                    # saver.save(session, sigma_file)
+                    # np.save(sigma_file, sigma)
+                    # else:
 
-            eigen_values, eigen_vectors = np.linalg.eig(sigma)
-            eigen_values = eigen_values[eigen_values != 0]
-            eigen_values.sort()
+                    # eig_file = file_start + ".eig.%d.ckpt" % n
+                    # if not os.path.isfile(eig_file):
+                    session = tf.Session()
+                    eigen_values = tf.self_adjoint_eigvals(sigma)
+                    session.run(sigma)
+                    # saver.save(session, eig_file)
 
-            self.initial_widths[n] = int(layer.output.shape[-1])
-            self.covariance_matrices.append(sigma)
-            self.eigen_values.append(eigen_values)
+                    # eigen_values, eigen_vectors = np.linalg.eig(sigma)
+                    # eigen_values = eigen_values[eigen_values != 0]
+                    # eigen_values.sort()
+                    # np.save(eig_file, eigen_values)
+
+                    saver.save(session, save_path)
+                else:
+                    # eigen_values = np.load(eig_file)
+                    saver.restore(session, save_path)
+                    sigma = tf.get_variable("sigma")
+                    eigen_values = tf.get_variable("eigen_values")
+                sigma.eval()
+                eigen_values.eval()
+
+                self.initial_widths[n] = int(layer.output.shape[-1])
+                self.covariance_matrices.append(sigma)
+                self.eigen_values.append(eigen_values)
 
     def objective_function(self, lamb):
         last = self.degree_of_freedom(lamb=lamb[0], layer=0)
@@ -88,13 +125,13 @@ class LambdaOptimizer:
             n_of_lamb = [dof(lamb, layer) for layer, lamb in enumerate(lambs)]
             return np.linalg.norm(n_of_lamb - iw)
 
-        lamb0 = np.ones(self.num_layers)*10
+        lamb0 = np.ones(self.num_layers) * 10
         res = opt.minimize(fun, lamb0)
         initial_lamb = res.x
 
         result = opt.minimize(self.objective_function, initial_lamb, method='L-BFGS-B', )
 
-        print(result)
+        logging.debug(str(result))
         lambdas = result.x
         layer_widths = [self.degree_of_freedom(lamb, layer) for layer, lamb in enumerate(lambdas)]
 
@@ -113,25 +150,26 @@ class WidthOptimizer:
     def compress(self, model, alpha=0.01, method="greedy", x_train=None,
                  y_train=None):
 
-        for n, layer in enumerate(self.model.layers):
-            print("Compressing layer %d - %s" % (n, str(layer.__class__)))
-            if layer.__class__ != Dense:
-                print("Skipping...")
+        for n, layer in enumerate(model.layers):
+            logging.info("Compressing layer %d - %s" % (n, str(layer.__class__)))
+            if layer.__class__.__name__ not in accepted_layers:
+                logging.info("Skipping...")
                 continue
             weights, biases = layer.get_weights()
+            sigma = compute_covariance_matrix(model=model, layer=layer, batch=x_train)
             if method == "greedy":
                 neurons, excluded = self._greedy(sigma, alpha)
 
-                print('Theoretical %f and compressed size %d/%d' %
-                      (self.theoretical_widths[n], len(neurons), len(neurons) + len(excluded)))
-                print('Compressed layer', neurons)
+                logging.info('Theoretical %f and compressed size %d/%d' %
+                             (self.theoretical_widths[n], len(neurons), len(neurons) + len(excluded)))
+                logging.debug('Compressed layer %s' % str(neurons))
 
                 weights[:, excluded] = 0
                 biases[excluded] = 0
                 # weights = weights[:, neurons]
                 # biases = biases[neurons]
                 # TODO W=A*W
-                adapted_layer = Dense(len(neurons))
+                # adapted_layer = Dense(len(neurons))
                 # layer.output_shape = len(neurons)
                 layer.set_weights([weights, biases])
                 sigma = compute_covariance_matrix(model, layer, x_train[:100])
@@ -170,11 +208,11 @@ class WidthOptimizer:
             model_difference = np.trace(cov) + best_choice
             constraint.append(model_difference)
             if model_difference <= alpha:
-                print('Finished after %d - %f' % (steps, model_difference))
+                logging.debug('Finished after %d - %f' % (steps, model_difference))
                 break
 
             if steps % 10 == 0:
-                print('Step %d - %f' % (steps, model_difference))
+                logging.debug('Step %d - %f' % (steps, model_difference))
             steps += 1
 
         # if self.plot:

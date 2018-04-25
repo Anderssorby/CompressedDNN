@@ -1,4 +1,6 @@
 *.pyc
 *.h5
+computed
+log
 .ropeproject
 .idea

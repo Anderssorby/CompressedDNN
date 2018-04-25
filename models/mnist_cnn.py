@@ -12,6 +12,7 @@ from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Flatten
 from keras.layers import Conv2D, MaxPooling2D
 from keras import backend as K
+import keras_utils
 import os
 
 save_dir = os.path.join(os.getcwd(), 'models/saved_models')
@@ -46,8 +47,8 @@ print(x_train.shape[0], 'train samples')
 print(x_test.shape[0], 'test samples')
 
 # convert class vectors to binary class matrices
-y_train = keras.utils.to_categorical(y_train, num_classes)
-y_test = keras.utils.to_categorical(y_test, num_classes)
+y_train = keras_utils.to_categorical(y_train, num_classes)
+y_test = keras_utils.to_categorical(y_test, num_classes)
 
 if os.path.isfile(model_path):
     model = load_model(model_path)

@@ -16,7 +16,8 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import Conv2D, UpSampling2D
 from keras.layers.core import Reshape, Dense, Dropout, Activation, Flatten
 from keras.layers.normalization import *
-from keras.models import Model, Sequential
+from keras.models import Model
+from keras.initializers import glorot_normal
 from keras.optimizers import *
 from tqdm import tqdm
 import os
@@ -59,7 +60,7 @@ dopt = Adam(lr=1e-3)
 # Build Generative model ...
 nch = 200
 g_input = Input(shape=[100])
-H = Dense(nch * 14 * 14, kernel_initializer='glorot_normal')(g_input)
+H = Dense(nch * 14 * 14, init=glorot_normal)(g_input)
 H = BatchNormalization()(H)
 H = Activation('relu')(H)
 H = Reshape([nch, 14, 14])(H)
