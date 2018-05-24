@@ -1,31 +1,61 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
+import os
+import shutil
+from multiprocessing import Process
+from multiprocessing import Queue
+
 import chainer.functions as F
 import chainer.links as L
-
+import chainer.serializers
+import numpy as np
+import six
+from chainer import Variable
 from chainer import computational_graph
 from chainer import cuda
 from chainer import optimizers
 from chainer import serializers
-from chainer import Variable
+from odin.utils import draw_loss
+
+from odin.utils.transformer import Transformer
 from .base import ChainerModelWrapper
-import chainer.serializers
-import logging
-from multiprocessing import Process
-from multiprocessing import Queue
-import os
-import draw_loss
-import six
-import numpy as np
 
 
 class VGG2Wrapper(ChainerModelWrapper):
     model_name = "VGG2"
+    dataset_name = "cifar-10"
 
     def construct(self):
         model = VGG2()
         return model
+
+    def train(self, x_train=None, y_train=None, **options):
+        optimizer = get_model_optimizer(self.model, args=options)
+        # create model and optimizer
+        # model, optimizer = get_model_optimizer(args)
+        # dataset = load_dataset(args.datadir)
+        tr_data, tr_labels, te_data, te_labels = dataset
+        epochs = options.get("epoch", default=10)
+        validate_freq = options.get("validate_freq", default=5)
+        lr_decay_freq = options.get("lr_decay_freq", default=1)
+        lr_decay_ratio = options.get("lr_decay_ratio", default=0.1)
+
+        args = {}
+
+        # learning loop
+        for epoch in range(1, epochs + 1):
+            logging.info('learning rate:{}'.format(optimizer.lr))
+
+            one_epoch(args, self.model, optimizer, tr_data, tr_labels, epoch, train=True)
+
+            if epoch == 1 or epoch % validate_freq == 0:
+                one_epoch(args, self.model, optimizer, te_data, te_labels, epoch, train=False)
+
+            if args.opt == 'MomentumSGD' and epoch % lr_decay_freq == 0:
+                optimizer.lr *= lr_decay_ratio
+        one_epoch(model=self.model, optimizer=optimizer)
 
 
 class VGG2(chainer.Chain):
@@ -55,9 +85,6 @@ class VGG2(chainer.Chain):
             fc6=L.Linear(1024, 10),
         )
         self.train = True
-
-    def construct(self):
-        pass
 
     def __call__(self, x, t, b_Anal=False):
         print('kita')
@@ -137,9 +164,9 @@ class VGG2(chainer.Chain):
             return self.pred
 
 
-def get_model_optimizer(args):
+def get_model_optimizer(model, args):
     model_fn = os.path.basename(args.model)
-    model = VGG2(wbase=args.wbase)
+    # model = VGG2(wbase=args.wbase)
 
     dst = '%s/%s' % (args.result_dir, model_fn)
     if not os.path.exists(dst):
@@ -171,14 +198,13 @@ def get_model_optimizer(args):
         if args.opt == 'MomentumSGD':
             optimizer.add_hook(
                 chainer.optimizer.WeightDecay(args.weight_decay))
-        return model, optimizer
+        return optimizer
     else:
         print('No optimizer generated.')
-        return model
 
 
 def augmentation(args, aug_queue, data, label, train):
-    trans = Transform(args)
+    trans = Transformer(args)
     # np.random.seed(int(time.time()))
     perm = np.random.permutation(data.shape[0])
     if train:

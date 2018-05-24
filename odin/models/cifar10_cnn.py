@@ -5,14 +5,17 @@ It gets to 75% validation accuracy in 25 epochs, and 79% after 50 epochs.
 '''
 
 from __future__ import print_function
+
+import os
+
 import keras
 from keras.datasets import cifar10
-from keras.preprocessing.image import ImageDataGenerator
-from keras.models import Sequential, load_model
-from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Conv2D, MaxPooling2D
-import keras_utils
-import os
+from keras.layers import Dense, Dropout, Activation, Flatten
+from keras.models import Sequential, load_model
+from keras.preprocessing.image import ImageDataGenerator
+
+from odin.utils import keras_utils
 
 batch_size = 32
 num_classes = 10

@@ -11,12 +11,12 @@ import numpy as np
 import re
 import sys
 
-if 'linux' in sys.platform:
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-else:
-    import matplotlib.pyplot as plt
+# if 'linux' in sys.platform:
+#     import matplotlib
+#     matplotlib.use('Agg')
+#     import matplotlib.pyplot as plt
+# else:
+import matplotlib.pyplot as plt
 
 
 def draw_loss_curve(logfile, outfile, epoch=2):

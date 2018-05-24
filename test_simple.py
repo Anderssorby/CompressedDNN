@@ -1,52 +1,26 @@
-import argparse
-import logging
-import os
-import time
-
-import keras
 import matplotlib.pyplot as plt
+from odin.compute.compress import WidthOptimizer
+from odin.utils.default import default_chainer
+import logging
 import numpy as np
+import keras
 
-from compute.compress import WidthOptimizer, LambdaOptimizer
-from models import load_model
-
-
-def prepare_logging(args):
-    log_dir = os.path.join('log', str(os.path.basename(args['model']).split('.')[0]),
-                           time.strftime('%Y-%m-%d_%H-%M-%S_') + str(time.time()).replace('.', ''))
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    log_file = os.path.join(log_dir, 'log.txt')
-    logging.basicConfig(
-        format='%(asctime)s [%(levelname)s] %(message)s',
-        filename=log_file, level=logging.DEBUG)
-    logging.info(args)
-
+from odin.compute.lambda_param import LambdaOptimizer
 
 if __name__ == '__main__':
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-m", "--model", required=False,
-                    default="keras_xor", help="model to compress")
-    ap.add_argument("-f", "--file-prefix", required=False,
-                    default="save", help="prefix for the files of computed values")
-    ap.add_argument('--seed', type=int, default=1701)
-    args = vars(ap.parse_args())
-    prepare_logging(args)
 
-    np.random.seed(args['seed'])
-
-    model, training_data, target_data = load_model(args["model"])
+    co, args, model_wrapper = default_chainer()
 
     logging.info("Optimizing theoretical layer width")
-    lambda_optimizer = LambdaOptimizer(model=model)
-    lambda_optimizer.compute_or_load(file_prefix=args["file_prefix"], x_train=training_data)
+    lambda_optimizer = LambdaOptimizer(model=model_wrapper.model)
+    lambda_optimizer.compute_or_load(file_prefix=args["file_prefix"], x_train=model_wrapper.x_train)
     lambdas = lambda_optimizer.optimize()
     logging.debug("Lambdas = %s" % str(lambdas))
 
     n = 10
     alphas = np.linspace(0.01, 0.1, num=n)
 
-    initial_loss, v = model.test_on_batch(training_data, target_data)
+    initial_loss, v = model_wrapper.model.test_on_batch(model_wrapper.x_test, model_wrapper.y_test)
     logging.info("Test before compression %s" % str(initial_loss))
 
     compressed_loss = np.zeros(n)
@@ -57,8 +31,9 @@ if __name__ == '__main__':
 
         optimizer = WidthOptimizer(theoretical_widths=lambdas, lmb=0.8, plot=True)
 
-        compressed_model = keras.models.clone_model(model)
-        optimizer.compress(compressed_model, x_train=training_data, y_train=target_data, alpha=0.01, method="greedy")
+        compressed_model = keras.models.clone_model(model_wrapper.model)
+        optimizer.compress(compressed_model, x_train=model_wrapper.x_train, y_train=model_wrapper.y_train, alpha=0.01,
+                           method="greedy")
 
         compressed_model.compile(loss='mean_squared_error',
                                  optimizer='adam',

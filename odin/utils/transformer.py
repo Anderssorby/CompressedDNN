@@ -1,17 +1,25 @@
 
 import six
 from scipy.misc import imresize
-import np
+import numpy as np
 
 
-class Transform(object):
-    cropping_size = 24
-    scaling_size = 28
+class Transformer(object):
 
-    def __init__(self, args):
+    def __init__(self, args=None,
+                 cropping_size=24,
+                 scaling_size=28,
+                 x_shape=None):
         self.args = args
+        self.x_shape = x_shape
+        self.cropping_size = cropping_size
+        self.scaling_size = scaling_size
 
     def __call__(self, img):
+        # type: (np.ndarray) -> np.ndarray
+        if len(img.shape) == 1:
+            l = int(np.sqrt(img.shape[0]))
+            img = img.reshape((l, l))
         imgs = []
 
         for offset_y in six.moves.range(0, 8 + 4, 4):

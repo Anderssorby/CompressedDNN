@@ -1,15 +1,38 @@
 from .base import ComputationInterface
 import tensorflow as tf
 from keras import backend as K
+from keras.models import Model
 import os
 import logging
+from scipy.sparse import lil_matrix, csr_matrix
+
 
 accepted_layers = ['Dense', 'Conv2D', 'Conv1D']
 
 
 class TensorflowWrapper(ComputationInterface):
 
-    def calc_eigs(self, model_wrapper, exp_type, epoch_stage=15):
+    def store_elements(self, elements, element_name, model_name):
+        raise NotImplemented
+
+    def load_group(self, group_name, model_name):
+        raise NotImplementedError("Not implemented yet")
+
+    @staticmethod
+    def compute_covariance_matrix(model, layer, batch):
+        intermediate_layer_model = Model(inputs=model.input,
+                                         outputs=layer.output)
+        output = intermediate_layer_model.predict(batch)
+        flat_shape = output[0].flatten().shape[0]
+        sigma = lil_matrix((flat_shape, flat_shape))
+        n = len(batch)
+        for i in range(n):
+            g = output[i].flatten()
+            sigma += np.outer(g, g)
+        sigma = 1 / (n - 1) * sigma
+        return csr_matrix.todense(sigma)
+
+    def calc_inter_layer_covariance(self, model_wrapper):
         model = model_wrapper.model
 
         path = os.path.join(self.saving_dir, model.model_name)

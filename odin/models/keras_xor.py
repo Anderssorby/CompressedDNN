@@ -1,10 +1,10 @@
 import numpy as np
 from keras.models import Sequential
 from keras.layers.core import Dense
-from .base import ModelWrapper
+from .base import KerasModelWrapper
 
 
-class KerasXOR(ModelWrapper):
+class KerasXOR(KerasModelWrapper):
     model_name = 'keras_xor'
 
     # the four different states of the XOR gate
