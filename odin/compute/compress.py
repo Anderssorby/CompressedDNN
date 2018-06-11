@@ -3,8 +3,6 @@ import logging
 
 import numpy as np
 
-from odin.compute import default_interface as co
-
 accepted_layers = ['Dense', 'Conv2D', 'Conv1D']
 
 
@@ -19,112 +17,118 @@ def generalization_error(lambs, n):
     return bias + variance
 
 
-class WidthOptimizer:
-    def __init__(self, theoretical_widths=None, **kwargs):
+class CovarianceOptimizer:
+    def __init__(self, model_wrapper, **kwargs):
         self.plot = False
-        self.theoretical_widths = theoretical_widths
+        self.model_wrapper = model_wrapper
+        self.covariance_matrices = model_wrapper.get_element("inter_layer_covariance", "cov")
         self.__dict__.update(**kwargs)
 
-    def compress(self, model, alpha=0.01, method="greedy", x_train=None,
-                 y_train=None):
+    def compress(self, alpha=0.01, method="greedy"):
+        result = []
 
-        for n, layer in enumerate(model.layers):
+        for n, layer in enumerate(self.model_wrapper.layers()):
             logging.info("Compressing layer %d - %s" % (n, str(layer.__class__)))
             if layer.__class__.__name__ not in accepted_layers:
                 logging.info("Skipping...")
                 continue
             weights, biases = layer.get_weights()
-            sigma = co.compute_covariance_matrix(model=model, layer=layer, batch=x_train)
+            sigma = self.covariance_matrices[n]
             if method == "greedy":
-                neurons, excluded = self._greedy(sigma, alpha)
+                neurons, excluded = _greedy(sigma, alpha)
+                result.append((neurons, excluded))
 
-                logging.info('Theoretical %f and compressed size %d/%d' %
-                             (self.theoretical_widths[n], len(neurons), len(neurons) + len(excluded)))
+                # logging.info('Theoretical %f and compressed size %d/%d' %
+                #             (self.theoretical_widths[n], len(neurons), len(neurons) + len(excluded)))
                 logging.debug('Compressed layer %s' % str(neurons))
 
                 weights[:, excluded] = 0
                 biases[excluded] = 0
+
                 # weights = weights[:, neurons]
                 # biases = biases[neurons]
                 # TODO W=A*W
                 # adapted_layer = Dense(len(neurons))
                 # layer.output_shape = len(neurons)
-                layer.set_weights([weights, biases])
-                sigma = co.compute_covariance_matrix(model, layer, x_train[:100])
+                # layer.set_weights([weights, biases])
 
                 # compute_eigen_values(sigma, plot=True)
             else:
-                A = self._group_sparse(sigma)
+                A = _group_sparse(sigma)
 
                 adjusted_weights = A.dot(weights)
 
-    def _greedy(self, cov, alpha):
-        constraint = []
-        possible = np.arange(cov.shape[0])
-        neurons = []
-        steps = 0
-        while len(neurons) < len(possible):
-            best_choice = 1e100
-            best_index = None
-            for j in possible:
-                if j in neurons:
-                    continue
+            return result
 
-                n_p_j = neurons + [j]
-                reduced_cov = cov[np.ix_(n_p_j, n_p_j)]
-                residual = -np.trace(reduced_cov)
 
-                if residual < best_choice:
-                    best_choice = residual
-                    best_index = j
+def _greedy(cov, alpha):
+    constraint = []
+    possible = np.arange(cov.shape[0])
+    neurons = []
+    steps = 0
+    while len(neurons) < len(possible):
+        best_choice = 1e100
+        best_index = None
+        for j in possible:
+            if j in neurons:
+                continue
 
-            if best_index is not None:
-                neurons.append(best_index)
-            else:
-                raise Exception("No greedy choice")
+            n_p_j = neurons + [j]
+            reduced_cov = cov[np.ix_(n_p_j, n_p_j)]
+            residual = -np.trace(reduced_cov)
 
-            model_difference = np.trace(cov) + best_choice
-            constraint.append(model_difference)
-            if model_difference <= alpha:
-                logging.debug('Finished after %d - %f' % (steps, model_difference))
-                break
+            if residual < best_choice:
+                best_choice = residual
+                best_index = j
 
-            if steps % 10 == 0:
-                logging.debug('Step %d - %f' % (steps, model_difference))
-            steps += 1
+        if best_index is not None:
+            neurons.append(best_index)
+        else:
+            raise Exception("No greedy choice")
 
-        # if self.plot:
-        #     plt.figure()
-        #     plt.plot(constraint)
-        #     plt.title("Model difference")
-        #     plt.draw()
+        model_difference = np.trace(cov) + best_choice
+        constraint.append(model_difference)
+        if model_difference <= alpha:
+            logging.debug('Finished after %d - %f' % (steps, model_difference))
+            break
 
-        neurons.sort()
-        return neurons, list(set(possible).difference(neurons))
+        if steps % 10 == 0:
+            logging.debug('Step %d - %f' % (steps, model_difference))
+        steps += 1
 
-    def _group_sparse(self, cov):
-        # min tr(ASA^T - 2AS) + lambda * sum(norm(A[:, j]))
-        lmb = 0.9
+    # if self.plot:
+    #     plt.figure()
+    #     plt.plot(constraint)
+    #     plt.title("Model difference")
+    #     plt.draw()
 
-        def objective_function(a):
-            return np.trace(a.dot(cov).dot(a.T) - 2 * a.dot(cov)) \
-                   + lmb * np.sum([np.linalg.norm(a[:, j]) for j in range(a.shape[0])])
+    neurons.sort()
+    return neurons, list(set(possible).difference(neurons))
 
-        max_iterations = 10000
-        etha = 0.1
-        n = cov.shape[0]
-        I = np.eye(n)
-        # Initial
-        A = np.eye(n)
-        steps = 0
-        while steps < max_iterations:
 
-            loss = objective_function(A)
+def _group_sparse(cov):
+    # min tr(ASA^T - 2AS) + lambda * sum(norm(A[:, j]))
+    lmb = 0.9
 
-            A = A - etha * (cov.dot(A) - 2 * cov + lmb * I)
+    def objective_function(a):
+        return np.trace(a.dot(cov).dot(a.T) - 2 * a.dot(cov)) \
+               + lmb * np.sum([np.linalg.norm(a[:, j]) for j in range(a.shape[0])])
 
-            if loss < 1e-4:
-                break
-            steps += 1
+    max_iterations = 10000
+    etha = 0.1
+    n = cov.shape[0]
+    I = np.eye(n)
+    # Initial
+    A = np.eye(n)
+    steps = 0
+    while steps < max_iterations:
 
-        return A
+        loss = objective_function(A)
+
+        A = A - etha * (cov.dot(A) - 2 * cov + lmb * I)
+
+        if loss < 1e-4:
+            break
+        steps += 1
+
+    return A

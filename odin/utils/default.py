@@ -1,12 +1,11 @@
-import argparse
-import logging
-import os
 import time
 
+import argparse
+import logging
 import numpy as np
+import os
 
 import odin
-from odin import compute
 from odin.models import load_model
 
 
@@ -26,6 +25,12 @@ def default_chainer():
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", required=False,
                     default="mnist_vgg2", help="model to compress")
+    ap.add_argument('--prefix', type=str, default='',
+                    help="An additional label for your model")
+
+    ap.add_argument("-a", "--action", dest="action", required=False,
+                    default="", help="action keyword")
+
     ap.add_argument("-f", "--file-prefix", required=False,
                     default="save", help="prefix for the files of computed values")
     ap.add_argument("--interface", required=False,
@@ -40,6 +45,10 @@ def default_chainer():
     ap.add_argument("--ask", "--prompt", type=bool, dest="prompt", default=True,
                     help="Whether to ask before downloading.")
 
+
+    ap.add_argument('--unit', '-u', type=int, default=1000,
+                    help='Number of units')
+
     # optimization
     ap.add_argument('--opt', type=str, default='MomentumSGD',
                     choices=['MomentumSGD', 'Adam', 'AdaGrad'])
@@ -50,11 +59,32 @@ def default_chainer():
     ap.add_argument('--lr_decay_ratio', type=float, default=0.1)
     ap.add_argument('--validate_freq', type=int, default=1)
     ap.add_argument('--seed', type=int, default=1701)
+    ap.add_argument('--frequency', type=int, default=-1)
+
+    ap.add_argument('--test', action='store_true',
+                    help='Use tiny datasets for quick tests')
+    ap.add_argument('--gradclip', '-c', type=float, default=5,
+                    help='Gradient norm threshold to clip')
+
+    ap.add_argument('--bproplen', '-l', type=int, default=35,
+                    help='Number of words in each mini-batch '
+                         '(= length of truncated BPTT)')
+
+    # RNN text generation
+    ap.add_argument('--primetext', '-p', type=str, default='',
+                    help='base text data, used for text generation')
 
     args = ap.parse_args()
 
     prepare_logging(args)
-    interface = compute.chainer.Chainer if args.interface is "chainer" else compute.TensorflowWrapper
+
+    if args.interface is "chainer":
+        from odin.compute.chainer import Chainer
+        interface = Chainer
+    else:
+        from odin.compute.tf import TensorflowWrapper
+        interface = TensorflowWrapper
+
     co = interface(args)
 
     np.random.seed(args.seed)

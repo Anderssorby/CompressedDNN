@@ -30,13 +30,10 @@ class MLP(chainer.Chain):
             return h3
 
 
-class MnistWrapper(ChainerModelWrapper):
+class MNISTWrapper(ChainerModelWrapper):
 
     dataset_name = "mnist"
     model_name = "mnist_vgg2"
-
-    def save(self):
-        pass
 
     def train(self, x_train=None, y_train=None, **options):
         args = options.get("args")
@@ -78,8 +75,9 @@ class MnistWrapper(ChainerModelWrapper):
 
         trainer.extend(report)
 
+        plot = options.get("plot", getattr(args, "plot", None))
         # Save two plot images to the result dir
-        if args.plot and extensions.PlotReport.available():
+        if plot and extensions.PlotReport.available():
             trainer.extend(
                 extensions.PlotReport(['main/loss', 'validation/main/loss'],
                                       'epoch', file_name='loss.png'))
@@ -100,20 +98,22 @@ class MnistWrapper(ChainerModelWrapper):
         # Print a progress bar to stdout
         trainer.extend(extensions.ProgressBar())
 
-        if args.resume:
+        resume = options.get("resume", getattr(args, "resume", None))
+        if resume:
             # Resume from a snapshot
             chainer.serializers.load_npz(args.resume, trainer)
 
         # Run the training
         trainer.run()
 
-    def construct(self, unit=1000):
+    def construct(self):
+        unit = self.args.get("unit")
         model = L.Classifier(MLP(unit, 10))
         return model
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Chainer example: MNIST')
+    parser = argparse.ArgumentParser(description='')
     parser.add_argument('--batchsize', '-b', type=int, default=100,
                         help='Number of images in each mini-batch')
     parser.add_argument('--epoch', '-e', type=int, default=20,
@@ -136,7 +136,7 @@ def main():
     print('# epoch: {}'.format(args.epoch))
     print('')
 
-    mw = MnistWrapper(args=args)
+    mw = MNISTWrapper(args=args)
     mw.train(args=args)
 
 

@@ -1,24 +1,23 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import logging
-import os
-import shutil
-from multiprocessing import Process
-from multiprocessing import Queue
-
 import chainer.functions as F
 import chainer.links as L
 import chainer.serializers
+import logging
 import numpy as np
+import os
+import shutil
 import six
 from chainer import Variable
 from chainer import computational_graph
 from chainer import cuda
 from chainer import optimizers
 from chainer import serializers
-from odin.utils import draw_loss
+from multiprocessing import Process
+from multiprocessing import Queue
 
+import odin.plot
 from odin.utils.transformer import Transformer
 from .base import ChainerModelWrapper
 
@@ -36,7 +35,7 @@ class VGG2Wrapper(ChainerModelWrapper):
         # create model and optimizer
         # model, optimizer = get_model_optimizer(args)
         # dataset = load_dataset(args.datadir)
-        tr_data, tr_labels, te_data, te_labels = dataset
+        tr_data, tr_labels, te_data, te_labels = self.dataset
         epochs = options.get("epoch", default=10)
         validate_freq = options.get("validate_freq", default=5)
         lr_decay_freq = options.get("lr_decay_freq", default=1)
@@ -284,7 +283,7 @@ def one_epoch(args, model, optimizer, data, label, epoch, train):
         logging.info('epoch:{}\ttest loss:{}\ttest accuracy:{}'.format(
             epoch, sum_loss / data.shape[0], sum_accuracy / data.shape[0]))
 
-    draw_loss.draw_loss_curve('{}/log.txt'.format(args.result_dir),
+    odin.plot.draw_loss_curve('{}/log.txt'.format(args.result_dir),
                               '{}/log.png'.format(args.result_dir), epoch)
 
     aug_worker.join()

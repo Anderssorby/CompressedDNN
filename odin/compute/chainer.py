@@ -5,9 +5,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import numpy as np
 import os
-from chainer import cuda
 from scipy import linalg as LA
 
 from odin import results_dir
@@ -16,11 +14,29 @@ from glob import glob
 
 
 class Chainer(ComputationInterface):
+    def __init__(self, args):
+        super(Chainer, self).__init__(args)
+
+        self.using_gpu = False
+        if self.args.gpu >= 0:
+            print("Getting GPU")
+            from chainer import cuda
+            self.cuda = cuda
+            cuda.get_device(self.args.gpu).use()
+            self.xp = cuda.cupy
+            self.using_gpu = True
+        else:
+
+            import numpy as np
+            self.xp = np
+
+        # self.__dict__.update(self.xp.__dict__)
+
     def load_group(self, group_name, model_wrapper):
         path = os.path.join(results_dir, model_wrapper.model_name, group_name, "*.npy")
         group = {}
         for f in glob(path):
-            element = np.load(f)
+            element = self.xp.load(f)
 
             name = f.split("/")[-1].split(".")[0]
             group[name] = element
@@ -32,20 +48,16 @@ class Chainer(ComputationInterface):
             os.makedirs(path)
 
         for key in elements:
-            np.save(os.path.join(path, key), elements[key])
+            self.xp.save(os.path.join(path, key), elements[key])
 
     def calc_inter_layer_covariance(self, model_wrapper, use_training_data=False):
 
         model = model_wrapper.model
 
-        using_gpu = False
-        if self.args.gpu >= 0:
-            print("Getting GPU")
-            cuda.get_device(self.args.gpu).use()
+        if self.using_gpu:
             model.to_gpu()
-            using_gpu = True
 
-        xp = cuda.cupy if self.args.gpu >= 0 else np
+        xp = self.xp
 
         train, test = model_wrapper.dataset
 
@@ -56,17 +68,17 @@ class Chainer(ComputationInterface):
 
         model.train = False
 
-        perm = np.random.permutation(data_size)
+        perm = xp.random.permutation(data_size)
 
         full_mean = []
         cov = []
         test_num = 0
 
-        for batch in range(0, data_size, batch_size):
+        for batch in range(0, data_size, step=batch_size):
             test_num += 1
             ind_tmp = perm[batch:batch + batch_size]
 
-            x = np.asarray(data[ind_tmp][0], dtype=np.float32)
+            x = xp.asarray(data[ind_tmp][0], dtype=xp.float32)
 
             layer_outputs = model.predictor(x, multi_layer=True)
             for i, layer_out in enumerate(layer_outputs):
@@ -87,8 +99,8 @@ class Chainer(ComputationInterface):
             # mean_cross = xp.outer(layer_mean, layer_mean)
             # mean_cross = mean_cross / layer_mean.shape[0]
             cov[jj] = cov[jj] / test_num
-            if using_gpu:
-                tmp_covma = cuda.to_cpu(cov[jj])
+            if self.using_gpu:
+                tmp_covma = self.cuda.to_cpu(cov[jj])
             else:
                 tmp_covma = cov[jj]
             eigs = LA.eigvalsh(tmp_covma)

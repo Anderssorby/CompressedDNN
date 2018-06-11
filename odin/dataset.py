@@ -74,12 +74,10 @@ class Dataset:
         self.prompt = prompt
         self.args = kwargs
 
-    @abstractmethod
     def _extract_train(self):
         # type: () -> (list, list)
         pass
 
-    @abstractmethod
     def _extract_test(self):
         # type: () -> (list, list)
         pass
@@ -211,9 +209,20 @@ class MNIST(Dataset):
         return train, test
 
 
+class PTBWords(Dataset):
+
+    name = "ptb_words"
+
+    def load(self):
+        import chainer
+        train, val, test = chainer.datasets.get_ptb_words()
+        return train, val, test
+
+
 datasets = {
     "cifar-10": Cifar_10,
-    "mnist": MNIST
+    "mnist": MNIST,
+    "ptb_words": PTBWords
 }
 
 if __name__ == "__main__":

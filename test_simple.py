@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from odin.compute.compress import WidthOptimizer
+from odin.compute.compress import CovarianceOptimizer
 from odin.utils.default import default_chainer
 import logging
 import numpy as np
@@ -12,8 +12,7 @@ if __name__ == '__main__':
     co, args, model_wrapper = default_chainer()
 
     logging.info("Optimizing theoretical layer width")
-    lambda_optimizer = LambdaOptimizer(model=model_wrapper.model)
-    lambda_optimizer.compute_or_load(file_prefix=args["file_prefix"], x_train=model_wrapper.x_train)
+    lambda_optimizer = LambdaOptimizer(model_wrapper=model_wrapper)
     lambdas = lambda_optimizer.optimize()
     logging.debug("Lambdas = %s" % str(lambdas))
 
@@ -29,7 +28,7 @@ if __name__ == '__main__':
     for i, alpha in enumerate(alphas):
         logging.info("alpha = %s" % str(alpha))
 
-        optimizer = WidthOptimizer(theoretical_widths=lambdas, lmb=0.8, plot=True)
+        optimizer = CovarianceOptimizer(theoretical_widths=lambdas, lmb=0.8, plot=True)
 
         compressed_model = keras.models.clone_model(model_wrapper.model)
         optimizer.compress(compressed_model, x_train=model_wrapper.x_train, y_train=model_wrapper.y_train, alpha=0.01,

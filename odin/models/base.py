@@ -16,6 +16,7 @@ class ModelWrapper(object):
 
     def __init__(self, **kwargs):
         self.args = kwargs
+        self.prefix = kwargs.get('prefix', None)
         self.dataset = self.load_dataset()
         if len(self.dataset) == 4:
             self.x_train, self.y_train, self.x_test, self.y_test = self.dataset
@@ -23,7 +24,7 @@ class ModelWrapper(object):
             self.load()
         else:
             self.model = self.construct()
-        self.model.model_name = self.model_name
+        # self.model.model_name = self.model_name
         self._elements = {}
 
     def get_group(self, group):
@@ -48,7 +49,10 @@ class ModelWrapper(object):
 
     @property
     def model_path(self):
-        return os.path.join(odin.model_save_dir, self.model_name)
+        if self.prefix:
+            return os.path.join(odin.model_save_dir, self.model_name, self.prefix)
+        else:
+            return os.path.join(odin.model_save_dir, self.model_name)
 
     @abstractmethod
     def construct(self):
@@ -111,10 +115,6 @@ class ChainerModelWrapper(ModelWrapper):
     model_type = "chainer"
     dataset_name = "mnist"
 
-    @abstractmethod
-    def construct(self):
-        pass
-
     def load(self):
 
         if os.path.isdir(self.model_path):
@@ -128,9 +128,13 @@ class ChainerModelWrapper(ModelWrapper):
         return load_dataset(self.dataset_name, options=self.args)
 
     def layers(self):
+        # TODO debug!!!!
         _layers = []
         for c in self.model.predictor.children():
             _layers.append(c)
 
         return _layers
+
+    def save(self):
+        pass
 
