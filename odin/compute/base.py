@@ -1,13 +1,14 @@
 from abc import abstractmethod
-import odin.compute
 
 
 class ComputationInterface(object):
     # abstracting computation operations
 
-    def __init__(self, args):
+    def __init__(self):
+        self.args = None
+
+    def update_args(self, args):
         self.args = args
-        odin.compute.default_interface = self
 
     @abstractmethod
     def calc_inter_layer_covariance(self, model_wrapper):

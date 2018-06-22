@@ -13,11 +13,19 @@ from .base import ComputationInterface
 from glob import glob
 
 
+# noinspection PyUnresolvedReferences
 class Chainer(ComputationInterface):
-    def __init__(self, args):
-        super(Chainer, self).__init__(args)
+    def __init__(self):
+        super(Chainer, self).__init__()
+
+        self.cuda = None
+        self.xp = None
 
         self.using_gpu = False
+
+    def update_args(self, args):
+        super(Chainer, self).update_args(args)
+
         if self.args.gpu >= 0:
             print("Getting GPU")
             from chainer import cuda
@@ -29,8 +37,6 @@ class Chainer(ComputationInterface):
 
             import numpy as np
             self.xp = np
-
-        # self.__dict__.update(self.xp.__dict__)
 
     def load_group(self, group_name, model_wrapper):
         path = os.path.join(results_dir, model_wrapper.model_name, group_name, "*.npy")
@@ -74,7 +80,7 @@ class Chainer(ComputationInterface):
         cov = []
         test_num = 0
 
-        for batch in range(0, data_size, step=batch_size):
+        for batch in range(0, data_size, batch_size):
             test_num += 1
             ind_tmp = perm[batch:batch + batch_size]
 
@@ -100,11 +106,10 @@ class Chainer(ComputationInterface):
             # mean_cross = mean_cross / layer_mean.shape[0]
             cov[jj] = cov[jj] / test_num
             if self.using_gpu:
-                tmp_covma = self.cuda.to_cpu(cov[jj])
+                tmp_cov_ma = self.cuda.to_cpu(cov[jj])
             else:
-                tmp_covma = cov[jj]
-            eigs = LA.eigvalsh(tmp_covma)
-            eigs = eigs[eigs != 0]
+                tmp_cov_ma = cov[jj]
+            eigs = LA.eigvals(tmp_cov_ma)
             eigen_values.append(eigs)
 
         # Saving

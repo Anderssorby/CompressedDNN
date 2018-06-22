@@ -54,7 +54,7 @@ class MNISTWrapper(ChainerModelWrapper):
                                                      repeat=False, shuffle=False)
 
         # Set up a trainer
-        updater = training.updaters.StandardUpdater(
+        updater = training.StandardUpdater(
             train_iter, optimizer, device=args.gpu)
         output = self.model_path
         trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=output)
@@ -106,8 +106,8 @@ class MNISTWrapper(ChainerModelWrapper):
         # Run the training
         trainer.run()
 
-    def construct(self):
-        unit = self.args.get("unit")
+    def construct(self, **kwargs):
+        unit = kwargs.get("unit", self.args.get("unit"))
         model = L.Classifier(MLP(unit, 10))
         return model
 

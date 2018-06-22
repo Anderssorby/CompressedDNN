@@ -18,7 +18,7 @@ class WassersteinGANUpdater(training.StandardUpdater):
         optimizers = {'generator': optimizer_generator,
                       'critic': optimizer_critic}
 
-        super(self, WassersteinGANUpdater).__init__(iterators, optimizers, device=device)
+        super(WassersteinGANUpdater, self).__init__(iterators, optimizers, device=device)
 
         if device >= 0:
             cuda.get_device(device).use()

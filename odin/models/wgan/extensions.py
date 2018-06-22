@@ -1,7 +1,7 @@
 import os
 import math
 
-from matplotlib import pyplot as plt
+from odin import plot as oplt
 
 from chainer import training, reporter, cuda
 from chainer.training import extension
@@ -11,26 +11,26 @@ def save_ims(filename, ims, dpi=100):
     n, c, w, h = ims.shape
     x_plots = math.ceil(math.sqrt(n))
     y_plots = x_plots if n % x_plots == 0 else x_plots - 1
-    plt.figure(figsize=(w*x_plots/dpi, h*y_plots/dpi), dpi=dpi)
+    oplt.figure(figsize=(w * x_plots / dpi, h * y_plots / dpi), dpi=dpi)
 
     for i, im in enumerate(ims):
-        plt.subplot(y_plots, x_plots, i+1)
+        oplt.subplot(y_plots, x_plots, i + 1)
 
         if c == 1:
-            plt.imshow(im[0])
+            oplt.imshow(im[0])
         else:
-            plt.imshow(im.transpose((1, 2, 0)))
+            oplt.imshow(im.transpose((1, 2, 0)))
 
-        plt.axis('off')
-        plt.gca().set_xticks([])
-        plt.gca().set_yticks([])
-        plt.gray()
-        plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0,
-                            hspace=0)
+        oplt.axis('off')
+        oplt.gca().set_xticks([])
+        oplt.gca().set_yticks([])
+        oplt.gray()
+        oplt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0,
+                             hspace=0)
 
-    plt.savefig(filename, dpi=dpi*2, facecolor='black')
-    plt.clf()
-    plt.close()
+    oplt.savefig(filename, dpi=dpi * 2, facecolor='black')
+    oplt.clf()
+    oplt.close()
 
 
 class GeneratorSample(extension.Extension):

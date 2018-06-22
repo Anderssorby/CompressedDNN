@@ -7,6 +7,7 @@ import os
 
 import odin
 from odin.models import load_model
+from odin.compute import default_interface as co
 
 
 def prepare_logging(args):
@@ -33,8 +34,6 @@ def default_chainer():
 
     ap.add_argument("-f", "--file-prefix", required=False,
                     default="save", help="prefix for the files of computed values")
-    ap.add_argument("--interface", required=False,
-                    default="chainer", choices=["chainer", "tensorflow"])
     ap.add_argument('--gpu', type=int, default=-1)
     ap.add_argument('--epoch', type=int, default=100)
     ap.add_argument('--batchsize', type=int, default=128)
@@ -78,18 +77,11 @@ def default_chainer():
 
     prepare_logging(args)
 
-    if args.interface is "chainer":
-        from odin.compute.chainer import Chainer
-        interface = Chainer
-    else:
-        from odin.compute.tf import TensorflowWrapper
-        interface = TensorflowWrapper
-
-    co = interface(args)
-
     np.random.seed(args.seed)
+
+    co.update_args(args)
 
     kwargs = vars(args)
     model_wrapper = odin.model_wrapper = load_model(args.model, **kwargs)
 
-    return co, args, model_wrapper
+    return args, model_wrapper

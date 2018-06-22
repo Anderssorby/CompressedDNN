@@ -26,6 +26,8 @@ def default_save_path(name, category=""):
     if category:
         args.append(category)
 
+    check_or_create_dir(os.path.join(*args))
+
     args.append(name)
 
-    return check_or_create_dir(os.path.join(*args))
+    return os.path.join(*args)

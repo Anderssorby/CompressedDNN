@@ -5,13 +5,12 @@ from abc import abstractmethod
 # import keras.backend as K
 import chainer.serializers
 
-from odin.dataset import load_dataset
-from odin.compute import default_interface as co
 import odin
+from odin.compute import default_interface as co
+from odin.dataset import load_dataset
 
 
 class ModelWrapper(object):
-
     model_name = "name_not_specified"
 
     def __init__(self, **kwargs):
@@ -55,7 +54,7 @@ class ModelWrapper(object):
             return os.path.join(odin.model_save_dir, self.model_name)
 
     @abstractmethod
-    def construct(self):
+    def construct(self, **kwargs):
         raise NotImplemented
 
     @abstractmethod
@@ -70,10 +69,17 @@ class ModelWrapper(object):
     def layers(self):
         raise NotImplemented
 
+    @abstractmethod
+    def weights(self):
+        raise NotImplemented
+
 
 class KerasModelWrapper(ModelWrapper):
 
-    def construct(self):
+    def weights(self):
+        return self.model.get_weights()
+
+    def construct(self, **kwargs):
         pass
 
     def layers(self):
@@ -137,4 +143,28 @@ class ChainerModelWrapper(ModelWrapper):
 
     def save(self):
         pass
+
+    def weights(self):
+        pass
+
+    def transfer_to_architecture(self, layer_widths):
+
+        layers = self.layers()
+        weights = []
+        biases = []
+        for layer in layers:
+            if type(layer) == "chainer.links.Linear":
+                weights.append(layer.W)
+                biases.append(layer.b)
+
+        self.construct(layer_widths=layer_widths, weights=weights, biases=biases)
+
+    def train(self, x_train=None, y_train=None, **options):
+        pass
+
+    def construct(self, **kwargs):
+        pass
+
+
+
 

@@ -9,7 +9,7 @@ from odin.compute.lambda_param import LambdaOptimizer
 
 if __name__ == '__main__':
 
-    co, args, model_wrapper = default_chainer()
+    args, model_wrapper = default_chainer()
 
     logging.info("Optimizing theoretical layer width")
     lambda_optimizer = LambdaOptimizer(model_wrapper=model_wrapper)

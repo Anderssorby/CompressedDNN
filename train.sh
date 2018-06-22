@@ -14,7 +14,12 @@
 
 
 # Set env
-. /fefs/opt/dgx/env_set/aip-gpinfo.sh
+if [ -f /fefs/opt/dgx/env_set/aip-gpinfo.sh ]; then
+ source /fefs/opt/dgx/env_set/aip-gpinfo.sh
+else
+ echo "Assuming test"
+fi
+
 # print date and time
 echo Time is `date`
 echo Directory is `pwd`
@@ -29,4 +34,10 @@ else
  cd ${PROJECT}
 fi
 
-python train.py --model wgan --gpu 0 --epoch 20
+# Parameters
+MODEL=cifar10_wgan
+EPOCH=10000
+ACTION=train_model
+GPU=0
+
+python do.py --action ${ACTION} --model ${MODEL} --gpu ${GPU} --epoch ${EPOCH}

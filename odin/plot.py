@@ -1,4 +1,10 @@
+import os
 import re
+
+import matplotlib as mat
+if os.getenv("DISPLAY") is None:
+    mat.use("Agg")
+
 from matplotlib import pyplot as plt
 from matplotlib.pyplot import *
 
@@ -36,7 +42,7 @@ def labels(x_label, y_label):
 
 def save(name="figure"):
     path = odin.default_save_path(name, category="plots")
-    plt.savefig(path)
+    plt.savefig(path + ".pdf", format="pdf")
 
 
 def show(*args):
