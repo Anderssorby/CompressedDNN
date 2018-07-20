@@ -1,7 +1,7 @@
 #!/bin/sh
 #$ -S /bin/sh
 # Script name
-#$ -N train-wgan
+#$ -N train_small_mnist
 # Job class name
 #$ -jc gpu-container_g1_dev
 #
@@ -14,20 +14,19 @@
 
 export PROJECT=CompressedDNN
 if [ ! -d ${PROJECT} ]; then
- echo "Can't find $PROJECT."
- echo $HOME
+ echo "Can't find $PROJECT is ill defined."
 else
  cd ${PROJECT}
 fi
 
-# Set env
 . ./get_env.sh
 
-
 # Parameters
-MODEL=cifar10_wgan
-EPOCH=10000
+MODEL=mnist_vgg2
+EPOCH=1000
 ACTION=train_model
 GPU=0
+PREFIX=small500
+UNIT=500
 
-python do.py --action ${ACTION} --model ${MODEL} --gpu ${GPU} --epoch ${EPOCH}
+python do.py --action ${ACTION} --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU} --epoch ${EPOCH} --unit ${UNIT}

@@ -22,8 +22,7 @@ class ModelWrapper(object):
         if os.path.isfile(self.model_path):
             self.load()
         else:
-            self.model = self.construct()
-        # self.model.model_name = self.model_name
+            self.model = self.construct(**kwargs)
         self._elements = {}
 
     def get_group(self, group):
@@ -146,18 +145,6 @@ class ChainerModelWrapper(ModelWrapper):
 
     def weights(self):
         pass
-
-    def transfer_to_architecture(self, layer_widths):
-
-        layers = self.layers()
-        weights = []
-        biases = []
-        for layer in layers:
-            if type(layer) == "chainer.links.Linear":
-                weights.append(layer.W)
-                biases.append(layer.b)
-
-        self.construct(layer_widths=layer_widths, weights=weights, biases=biases)
 
     def train(self, x_train=None, y_train=None, **options):
         pass

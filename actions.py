@@ -2,7 +2,7 @@ import logging
 
 from odin import plot as oplt
 from odin.compute import default_interface as co
-from odin.compute import lambda_param, compress
+from odin.compute import lambda_param, compress, architecture
 
 
 def test(model_wrapper, **kwargs):
@@ -30,12 +30,29 @@ def measure_goodness(model_wrapper, **kwargs):
     method = "Newton-CG"
     r_dof = model_wrapper.get_group("range_dof_%s" % method)
     bounds = r_dof["bounds"]
-    layer_widths = r_dof["layer_widths"]
+    layer_widths_list = r_dof["layer_widths"]
     lambdas = r_dof["lambdas"]
 
-    for lw in layer_widths:
-        new_model = model_wrapper.transfer_to_architecture(lw)
+    datastore = model_wrapper.get_group("inter_layer_covariance")
+    cov_list = datastore["cov"]
+    eigen_values = datastore["eigen_values"]
 
+    loss_before = []
+    loss_after = []
+
+    layer_widths = layer_widths_list[1]
+
+    new_model = architecture.transfer_to_architecture(model_wrapper=model_wrapper, layer_widths=layer_widths,
+                                                      cov_list=cov_list)
+
+    before = new_model.test()
+    loss_before.append(before)
+
+    # Fine tune
+    new_model.train()
+
+    after = new_model.test()
+    loss_after.append(after)
 
 
 def calc_dof(model_wrapper, **kwargs):
@@ -92,6 +109,10 @@ def train_model(model_wrapper, args, **kwargs):
     model_wrapper.train(args=args)
 
 
+def test_model(model_wrapper, args, **kwargs):
+    model_wrapper.test(args=args)
+
+
 actions = {
     "test": test,
     "range_test": range_test,
@@ -99,5 +120,6 @@ actions = {
     "calc_dof": calc_dof,
     "calc_eigs": calc_eigs,
     "train_model": train_model,
+    "measure_goodness": measure_goodness,
     "": test
 }
