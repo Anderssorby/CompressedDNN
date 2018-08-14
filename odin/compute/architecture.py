@@ -1,45 +1,77 @@
+import multiprocessing
+import time
+
 import chainer
 import numpy as np
 import numpy.linalg as LA
 
+import odin.plot as oplt
+
 
 def greedy(constraint, indexes, m_l):
-    j = set()
+    already = [855, 848, 625, 302, 948, 141, 16, 364, 801, 179, 843, 690, 540, 608, 705, 363, 878, 720, 40, 436, 780,
+               365, 560, 825, 571, 404]
+
+    selected = np.array(already, dtype=np.int16)  # []
+    plot = False
+    parallel = True
     choices = indexes
-    for i in range(m_l):
-        greedy_choice = None
-        current_best = np.inf
-        for node in choices:
-            c = constraint(j.union([node]))
-            if c < current_best:
-                greedy_choice = node
-                current_best = c
+    for i in range(len(selected), m_l):
+        print("i = %d" % i)
+        start = time.time()
 
-        j += greedy_choice
-        choices.remove(greedy_choice)
+        def calc(node):
+            return constraint(np.union1d(selected, node))
 
-    return j, c
+        if parallel:
+            pool = multiprocessing.Pool(processes=4)
+            values = pool.map_async(calc, choices, error_callback=error_reporter)
+            pool.close()
+        else:
+            values = map(calc, choices)
+
+        greedy_choice = np.argmax(values)
+
+        if plot:
+            values.sort()
+            oplt.plot(values)
+            oplt.show()
+            # current_best = np.max(values)
+
+        selected = np.union1d(selected, [greedy_choice])
+        choices = np.setdiff1d(choices, [greedy_choice])
+        print("selected = %s; choice = %s; time = %.5f" % (
+            selected, greedy_choice, time.time() - start))
+
+    return selected
 
 
-def compute_index_set(cov, m_l, shape):
+def compute_index_set(cov, m_l, shape, weights):
     indexes = np.arange(shape)
 
-    def gen_fun(theta, width):
-        tr = np.trace
-        I = np.eye(width)
-        R_z = np.eye(width)
+    tr = np.trace
+    theta = 0.5
+    W = weights
+    R_z = W.T.dot(np.linalg.pinv(W.dot(W.T))).dot(W)
 
-        def fun(j):
-            j = list(j)
-            f = np.setdiff1d(indexes, j)
-            sig_inv = LA.inv(cov[np.ix_(j, j)])
-            difference = tr((theta * I + (1 - theta) * R_z) * cov[np.ix_(f, j)] * sig_inv * cov[np.ix_(j, f)])
-            normalizer = tr(theta * I + (1 - theta) * R_z * cov[np.ix_(f, f)])
-            return difference / normalizer
+    def obj(j):
+        f = np.setdiff1d(indexes, j)
+        n = len(f)
+        sig_inv = LA.inv(cov[np.ix_(j, j)])
 
-        return fun
+        I = np.eye(n)
+        R_z = np.eye(n)  # Projection matrix
+        ch = theta * I + (1 - theta) * R_z
 
-    obj = gen_fun(theta=0.5, width=m_l)
+        difference = tr(ch.dot(cov[np.ix_(f, j)]).dot(sig_inv).dot(cov[np.ix_(j, f)]))
+        normalizer = tr(ch.dot(cov[np.ix_(f, f)]))
+        return difference / normalizer
+
+    # t = time.time
+    # s = t()
+    # obj([1, 10, 100])
+    # e = t()-s
+    # print("time_of(obj)=%f" % e)
 
     j, score = greedy(obj, indexes, m_l)
 
@@ -53,18 +85,21 @@ def transfer_to_architecture(model_wrapper, layer_widths, cov_list):
     biases = []
     for layer, m_l, cov in zip(layers, layer_widths, cov_list):
         if type(layer) == chainer.links.connection.linear.Linear:
-
-            shape = layer.out_size
+            shape = cov.shape[0]  # layer.out_size
             indexes = np.arange(shape)
-            j = compute_index_set(cov, m_l, shape)
+            j = compute_index_set(cov, m_l, shape, layer.W)
             f = np.setdiff1d(indexes, j)
 
-            I_w = np.eye(m_l) * regularizer_w
-            conversion_matrix = cov[f, j] / (cov[j, j] + I_w)
+            _I_w = np.eye(m_l) * regularizer_w
+            conversion_matrix = cov[np.ix_(f, j)] / (cov[np.ix_(j, j)] + _I_w)
             new_weights = conversion_matrix.dot(layer.W)
             weights.append(new_weights)
             biases.append(layer.b)
 
-    new_wrapper = model_wrapper.__class__(layer_widths=layer_widths)
+    new_wrapper = model_wrapper.__class__(layer_widths=layer_widths, prefix=str(time.time()) + "_transferred_")
 
     return new_wrapper
+
+
+def error_reporter(error):
+    print(error)

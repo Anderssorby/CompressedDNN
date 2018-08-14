@@ -3,7 +3,9 @@ from chainer import functions as F, datasets, optimizers, training
 from chainer import links as L
 
 from odin.models.base import ChainerModelWrapper
-from odin.models.wgan import RandomNoiseIterator, GaussianNoiseGenerator, WassersteinGANUpdater, GeneratorSample
+from odin.models.wgan.iterators import RandomNoiseIterator, GaussianNoiseGenerator
+from odin.models.wgan.updater import WassersteinGANUpdater
+from odin.models.wgan.extensions import GeneratorSample
 
 
 class Generator(chainer.Chain):
@@ -73,7 +75,7 @@ class WGANWrapper(ChainerModelWrapper):
     def __init__(self, **kwargs):
         super(WGANWrapper, self).__init__(**kwargs)
 
-    def construct(self):
+    def construct(self, **kwargs):
         self.generator = Generator()
         self.critic = Critic()
 

@@ -4,6 +4,7 @@ import argparse
 import logging
 import numpy as np
 import os
+import odin.actions
 
 import odin
 from odin.models import load_model
@@ -23,6 +24,10 @@ def prepare_logging(args):
 
 
 def default_chainer():
+    """
+    Sets up a basic environment for chainer and arguments for most actions
+    :return: args, model_wrapper
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", required=False,
                     default="mnist_vgg2", help="model to compress")
@@ -30,7 +35,7 @@ def default_chainer():
                     help="An additional label for your model")
 
     ap.add_argument("-a", "--action", dest="action", required=False,
-                    default="", help="action keyword")
+                    default="", choices=odin.actions.action_map.keys(), help="action keyword")
 
     ap.add_argument("-f", "--file-prefix", required=False,
                     default="save", help="prefix for the files of computed values")
@@ -43,7 +48,6 @@ def default_chainer():
                     help="To prevent out of memory on test run")
     ap.add_argument("--ask", "--prompt", type=bool, dest="prompt", default=True,
                     help="Whether to ask before downloading.")
-
 
     ap.add_argument('--unit', '-u', type=int, default=1000,
                     help='Number of units')

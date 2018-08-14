@@ -30,3 +30,6 @@ PREFIX=small500
 UNIT=500
 
 python do.py --action ${ACTION} --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU} --epoch ${EPOCH} --unit ${UNIT}
+python do.py --action calc_eigs --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU}
+python do.py --action calc_dof --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU}
+python do.py --action update_architecture --model ${MODEL} --prefix ${PREFIX}

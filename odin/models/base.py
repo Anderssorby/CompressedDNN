@@ -12,6 +12,7 @@ from odin.dataset import load_dataset
 
 class ModelWrapper(object):
     model_name = "name_not_specified"
+    dataset_name = "dataset_not_specified"
 
     def __init__(self, **kwargs):
         self.args = kwargs
@@ -71,6 +72,9 @@ class ModelWrapper(object):
     @abstractmethod
     def weights(self):
         raise NotImplemented
+
+    def __str__(self):
+        return "%s(%s) {dataset: %s} at '%s'" % (self.model_name, self.__class__.__name__, self.dataset_name, self.model_path)
 
 
 class KerasModelWrapper(ModelWrapper):
