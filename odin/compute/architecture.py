@@ -1,16 +1,30 @@
+"""
+Architecture contains functions to compute a new subset of nodes after compression.
+"""
 import multiprocessing
 import time
 
-import chainer
 import numpy as np
 import numpy.linalg as LA
+import chainer
 
 import odin.plot as oplt
 
 
+def pickle_fix(arg):
+    """
+    Makes nested functions pickable
+    """
+    pickle_fix.calc(arg)
+
+
 def greedy(constraint, indexes, m_l):
-    already = [855, 848, 625, 302, 948, 141, 16, 364, 801, 179, 843, 690, 540, 608, 705, 363, 878, 720, 40, 436, 780,
-               365, 560, 825, 571, 404]
+    """
+    Greedy selection of nodes
+    """
+    already = [855, 848, 625, 302, 948, 141, 16, 364, 801, 179,
+               843, 690, 540, 608, 705, 363, 878, 720, 40, 436,
+               780, 365, 560, 825, 571, 404]
 
     selected = np.array(already, dtype=np.int16)  # []
     plot = False
@@ -24,10 +38,12 @@ def greedy(constraint, indexes, m_l):
             return constraint(np.union1d(selected, node))
 
         if parallel:
+            pickle_fix.calc = calc
             pool = multiprocessing.Pool(processes=4)
-            values = pool.map_async(calc, choices, error_callback=error_reporter)
+            values = pool.map_async(pickle_fix, choices, error_callback=error_reporter)
             pool.close()
         else:
+            values: [float]
             values = map(calc, choices)
 
         greedy_choice = np.argmax(values)
@@ -52,7 +68,7 @@ def compute_index_set(cov, m_l, shape, weights):
     tr = np.trace
     theta = 0.5
     W = weights
-    R_z = W.T.dot(np.linalg.pinv(W.dot(W.T))).dot(W)
+    # R_z = W.T.dot(np.linalg.pinv(W.dot(W.T))).dot(W)
 
     def obj(j):
         f = np.setdiff1d(indexes, j)
