@@ -18,18 +18,14 @@ def pickle_fix(arg):
     pickle_fix.calc(arg)
 
 
-def greedy(constraint, indexes, m_l):
+def greedy(constraint, indexes, m_l, parallel=False):
     """
     Greedy selection of nodes
     """
-    already = [855, 848, 625, 302, 948, 141, 16, 364, 801, 179,
-               843, 690, 540, 608, 705, 363, 878, 720, 40, 436,
-               780, 365, 560, 825, 571, 404]
 
-    selected = np.array(already, dtype=np.int16)  # []
+    selected = np.array([])
     plot = False
-    parallel = True
-    choices = indexes
+    choices = np.array(indexes)
     for i in range(len(selected), m_l):
         print("i = %d" % i)
         start = time.time()
@@ -43,10 +39,10 @@ def greedy(constraint, indexes, m_l):
             values = pool.map_async(pickle_fix, choices, error_callback=error_reporter)
             pool.close()
         else:
-            values: [float]
-            values = map(calc, choices)
+            # values: [float]
+            values = list(map(calc, choices))
 
-        greedy_choice = np.argmax(values)
+        greedy_choice = choices[np.argmax(values)]
 
         if plot:
             values.sort()
