@@ -13,7 +13,7 @@ import odin.plot as oplt
 
 def pickle_fix(arg):
     """
-    Makes nested functions pickable
+    Makes nested functions picklable
     """
     pickle_fix.calc(arg)
 
@@ -24,7 +24,7 @@ def greedy(constraint, indexes, m_l, parallel=False):
     """
 
     selected = np.array([])
-    plot = False
+    plot = True
     choices = np.array(indexes)
     for i in range(len(selected), m_l):
         print("i = %d" % i)
@@ -36,7 +36,7 @@ def greedy(constraint, indexes, m_l, parallel=False):
         if parallel:
             pickle_fix.calc = calc
             pool = multiprocessing.Pool(processes=4)
-            values = pool.map_async(pickle_fix, choices, error_callback=error_reporter)
+            values = list(pool.map(pickle_fix, choices))
             pool.close()
         else:
             # values: [float]
@@ -45,7 +45,7 @@ def greedy(constraint, indexes, m_l, parallel=False):
         greedy_choice = choices[np.argmax(values)]
 
         if plot:
-            values.sort()
+            values = np.sort(values)
             oplt.plot(values)
             oplt.show()
             # current_best = np.max(values)
@@ -67,6 +67,7 @@ def compute_index_set(cov, m_l, shape, weights):
     # R_z = W.T.dot(np.linalg.pinv(W.dot(W.T))).dot(W)
 
     def obj(j):
+        j = list(map(int, j))
         f = np.setdiff1d(indexes, j)
         n = len(f)
         sig_inv = LA.inv(cov[np.ix_(j, j)])
@@ -79,13 +80,7 @@ def compute_index_set(cov, m_l, shape, weights):
         normalizer = tr(ch.dot(cov[np.ix_(f, f)]))
         return difference / normalizer
 
-    # t = time.time
-    # s = t()
-    # obj([1, 10, 100])
-    # e = t()-s
-    # print("time_of(obj)=%f" % e)
-
-    j, score = greedy(obj, indexes, m_l)
+    j, score = greedy(obj, indexes, m_l, parallel=True)
 
     return j
 
