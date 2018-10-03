@@ -108,7 +108,7 @@ class MNISTWrapper(ChainerModelWrapper):
 
     def test(self):
         _, test = self.dataset
-        
+        return test
 
     def construct(self, **kwargs):
         unit = self.args.get("unit")

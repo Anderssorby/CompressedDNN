@@ -5,12 +5,9 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import os
 from scipy import linalg as LA
 
-from odin import results_dir
 from .base import ComputationInterface
-from glob import glob
 
 
 # noinspection PyUnresolvedReferences
@@ -19,7 +16,6 @@ class Chainer(ComputationInterface):
         super(Chainer, self).__init__()
 
         self.cuda = None
-        self.xp = None
 
         self.using_gpu = False
 
@@ -37,24 +33,6 @@ class Chainer(ComputationInterface):
 
             import numpy as np
             self.xp = np
-
-    def load_group(self, group_name, model_wrapper):
-        path = os.path.join(results_dir, model_wrapper.model_name, group_name, "*.npy")
-        group = {}
-        for f in glob(path):
-            element = self.xp.load(f)
-
-            name = f.split("/")[-1].split(".")[0]
-            group[name] = element
-        return group
-
-    def store_elements(self, elements, group_name, model_wrapper):
-        path = os.path.join(results_dir, model_wrapper.model_name, group_name)
-        if not os.path.isdir(path):
-            os.makedirs(path)
-
-        for key in elements:
-            self.xp.save(os.path.join(path, key), elements[key])
 
     def calc_inter_layer_covariance(self, model_wrapper, use_training_data=False):
 

@@ -31,6 +31,9 @@ def default_chainer():
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", required=False,
                     default="mnist_vgg2", help="model to compress")
+    ap.add_argument("--new_model", required=False, type=bool,
+                    default=False, help="load or start from scratch")
+
     ap.add_argument('--prefix', type=str, default='',
                     help="An additional label for your model")
 
@@ -77,6 +80,9 @@ def default_chainer():
     ap.add_argument('--primetext', '-p', type=str, default='',
                     help='base text data, used for text generation')
 
+    ap.add_argument('--available_cores', type=int, default=4,
+                    help='The number of CPU cores that can be used for computation')
+
     args = ap.parse_args()
 
     prepare_logging(args)
@@ -86,6 +92,8 @@ def default_chainer():
     co.update_args(args)
 
     kwargs = vars(args)
+    odin.update_config(kwargs)
+
     model_wrapper = odin.model_wrapper = load_model(args.model, **kwargs)
 
     return args, model_wrapper

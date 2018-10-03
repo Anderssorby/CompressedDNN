@@ -4,10 +4,25 @@ from abc import abstractmethod
 # from keras.models import load_model
 # import keras.backend as K
 import chainer.serializers
+import glob
 
 import odin
 from odin.compute import default_interface as co
 from odin.dataset import load_dataset
+
+
+class LayerWrapper(object):
+    """
+    Wrapper for layers in a network
+    """
+    weights = None
+    biases = None
+    units = None
+
+    """
+    The original layer object
+    """
+    original = None
 
 
 class ModelWrapper(object):
@@ -20,11 +35,9 @@ class ModelWrapper(object):
         self.dataset = self.load_dataset()
         if len(self.dataset) == 4:
             self.x_train, self.y_train, self.x_test, self.y_test = self.dataset
-        if os.path.isfile(self.model_path):
-            self.load()
-        else:
-            self.model = self.construct(**kwargs)
+        self.model = self.load(new_model=kwargs["new_model"])
         self._elements = {}
+        self._layers = []
 
     def get_group(self, group):
 
@@ -39,7 +52,7 @@ class ModelWrapper(object):
         return self._elements[group][element_name]
 
     @abstractmethod
-    def load(self):
+    def load(self, new_model=False):
         raise NotImplemented
 
     @abstractmethod
@@ -88,7 +101,7 @@ class KerasModelWrapper(ModelWrapper):
     def layers(self):
         pass
 
-    def load(self):
+    def load(self, new_model=False):
         pass
 
     model_type = "keras"
@@ -120,29 +133,53 @@ class KerasModelWrapper(ModelWrapper):
         return load_dataset(self.dataset_name, options=self.args)
 
 
+class ChainerLayer(LayerWrapper):
+    layer_types = {
+        "chainer.links.connection.linear.Linear": "fully_connected"
+    }
+
+    def __init__(self, layer):
+        self.type = self.layer_types.get(type(layer).__name__, "unknown")
+        self.weights = layer.W
+        self.biases = layer.b
+        self.units = layer.out_size
+        self.original = layer
+
+
 class ChainerModelWrapper(ModelWrapper):
     model_type = "chainer"
     dataset_name = "mnist"
 
-    def load(self):
+    def load(self, new_model=False):
+        model = self.construct(**self.args)
+        snapshot = None
 
         if os.path.isdir(self.model_path):
-            snapshot = os.path.join(self.model_path, "snapshot_iter_1")
+            file_filter = os.path.join(self.model_path, "snapshot_iter_*")
+            snapshots = glob.glob(file_filter)
+            if snapshots:
+                snapshot = snapshots[-1]
+            else:
+                new_model = True
         else:
-            snapshot = self.model_path
-        chainer.serializers.load_hdf5(snapshot,
-                                      self.construct())
+            new_model = True
+
+        if not new_model:
+            model = chainer.serializers.load_hdf5(snapshot, model)
+
+        return model
 
     def load_dataset(self):
         return load_dataset(self.dataset_name, options=self.args)
 
     def layers(self):
         # TODO debug!!!!
-        _layers = []
-        for c in self.model.predictor.children():
-            _layers.append(c)
+        if not self._layers:
+            for c in self.model.predictor.children():
+                layer = ChainerLayer(c)
+                self._layers.append(layer)
 
-        return _layers
+        return self._layers
 
     def save(self):
         pass

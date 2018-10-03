@@ -6,16 +6,18 @@ import time
 
 import numpy as np
 import numpy.linalg as LA
-import chainer
+import logging
 
+import odin
 import odin.plot as oplt
+from odin.compute import default_interface as co
 
 
 def pickle_fix(arg):
     """
     Makes nested functions picklable
     """
-    pickle_fix.calc(arg)
+    return pickle_fix.calc(arg)
 
 
 def greedy(constraint, indexes, m_l, parallel=False):
@@ -24,7 +26,7 @@ def greedy(constraint, indexes, m_l, parallel=False):
     """
 
     selected = np.array([])
-    plot = True
+    plot = False
     choices = np.array(indexes)
     for i in range(len(selected), m_l):
         print("i = %d" % i)
@@ -35,8 +37,9 @@ def greedy(constraint, indexes, m_l, parallel=False):
 
         if parallel:
             pickle_fix.calc = calc
-            pool = multiprocessing.Pool(processes=4)
-            values = list(pool.map(pickle_fix, choices))
+            available_cores = odin.config.get("available_cores", 4)
+            pool = multiprocessing.Pool(processes=available_cores)
+            values = pool.map(pickle_fix, choices)
             pool.close()
         else:
             # values: [float]
@@ -52,7 +55,7 @@ def greedy(constraint, indexes, m_l, parallel=False):
 
         selected = np.union1d(selected, [greedy_choice])
         choices = np.setdiff1d(choices, [greedy_choice])
-        print("selected = %s; choice = %s; time = %.5f" % (
+        logging.debug("selected = %s; choice = %s; time = %.5f" % (
             selected, greedy_choice, time.time() - start))
 
     return selected
@@ -90,18 +93,21 @@ def transfer_to_architecture(model_wrapper, layer_widths, cov_list):
     layers = model_wrapper.layers()
     weights = []
     biases = []
-    for layer, m_l, cov in zip(layers, layer_widths, cov_list):
-        if type(layer) == chainer.links.connection.linear.Linear:
+    for l, (layer, m_l, cov) in enumerate(zip(layers, layer_widths, cov_list)):
+        if layer.type == "fully_connected":
             shape = cov.shape[0]  # layer.out_size
             indexes = np.arange(shape)
-            j = compute_index_set(cov, m_l, shape, layer.W)
+            j = compute_index_set(cov, m_l, shape, layer.weights)
+            co.store_elements(element_name="index_set", elements={"layer_%d" % l: j},
+                              model_name=model_wrapper.model_name)
+
             f = np.setdiff1d(indexes, j)
 
             _I_w = np.eye(m_l) * regularizer_w
             conversion_matrix = cov[np.ix_(f, j)] / (cov[np.ix_(j, j)] + _I_w)
-            new_weights = conversion_matrix.dot(layer.W)
+            new_weights = conversion_matrix.dot(layer.weights)
             weights.append(new_weights)
-            biases.append(layer.b)
+            biases.append(layer.biases)
 
     new_wrapper = model_wrapper.__class__(layer_widths=layer_widths, prefix=str(time.time()) + "_transferred_")
 

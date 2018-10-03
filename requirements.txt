@@ -1,4 +1,10 @@
 scipy
 numpy
-chainer
+scikit-image
+
+# Homology computation
 phat
+
+# Deep learning frameworks
+chainer
+keras

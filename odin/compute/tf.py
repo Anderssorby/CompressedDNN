@@ -12,12 +12,6 @@ accepted_layers = ['Dense', 'Conv2D', 'Conv1D']
 
 class TensorflowWrapper(ComputationInterface):
 
-    def store_elements(self, elements, element_name, model_name):
-        raise NotImplemented
-
-    def load_group(self, group_name, model_name):
-        raise NotImplementedError("Not implemented yet")
-
     @staticmethod
     def compute_covariance_matrix(model, layer, batch):
         intermediate_layer_model = Model(inputs=model.input,
