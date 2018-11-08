@@ -2,6 +2,8 @@
 Odin is a high level framework that enables deep-learning for the brutal age of machine learning.
 It organizes the jungle of frameworks into something that's comprehensible and extendable.
 """
+
+
 import os
 VERSION = 0.1
 
@@ -37,3 +39,9 @@ def default_save_path(name, category=""):
 
 def update_config(new_args):
     config.update(new_args)
+
+
+import odin.models
+import odin.actions
+import odin.compute
+import odin.utils

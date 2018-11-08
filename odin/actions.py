@@ -188,6 +188,7 @@ def train_model(model_wrapper, args, **kwargs):
     :return:
     """
     model_wrapper.train(args=args)
+    model_wrapper.save()
 
 
 def test_model(model_wrapper, args, **kwargs):

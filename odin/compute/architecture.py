@@ -109,7 +109,7 @@ def transfer_to_architecture(model_wrapper, layer_widths, cov_list):
             weights.append(new_weights)
             biases.append(layer.biases)
 
-    new_wrapper = model_wrapper.__class__(layer_widths=layer_widths, prefix=str(time.time()) + "_transferred_")
+    new_wrapper = model_wrapper.__class__(layer_widths=layer_widths, prefix=(model_wrapper.prefix + "_compressed"))
 
     return new_wrapper
 

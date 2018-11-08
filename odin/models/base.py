@@ -28,6 +28,7 @@ class LayerWrapper(object):
 class ModelWrapper(object):
     model_name = "name_not_specified"
     dataset_name = "dataset_not_specified"
+    _saved_model_name = "saved_model.h5"
 
     def __init__(self, **kwargs):
         self.args = kwargs
@@ -35,7 +36,7 @@ class ModelWrapper(object):
         self.dataset = self.load_dataset()
         if len(self.dataset) == 4:
             self.x_train, self.y_train, self.x_test, self.y_test = self.dataset
-        self.model = self.load(new_model=kwargs["new_model"])
+        self.model = self.load(new_model=kwargs.get("new_model", False))
         self._elements = {}
         self._layers = []
 
@@ -65,6 +66,10 @@ class ModelWrapper(object):
             return os.path.join(odin.model_save_dir, self.model_name, self.prefix)
         else:
             return os.path.join(odin.model_save_dir, self.model_name)
+
+    @property
+    def saved_model_path(self):
+        return os.path.join(self.model_path, self._saved_model_name)
 
     @abstractmethod
     def construct(self, **kwargs):
@@ -110,7 +115,7 @@ class KerasModelWrapper(ModelWrapper):
     def save(self):
         if not os.path.isdir(odin.model_save_dir):
             os.makedirs(odin.model_save_dir)
-        self.model.save(self.model_path)
+        self.model.save(self.saved_model_path)
 
         # def get_nth_layer_output(self, n, batch):
         #    if self.model_type == "keras":
@@ -165,7 +170,8 @@ class ChainerModelWrapper(ModelWrapper):
             new_model = True
 
         if not new_model:
-            model = chainer.serializers.load_hdf5(snapshot, model)
+            path = os.path.join(self.model_path, self._saved_model_name)
+            model = chainer.serializers.load_hdf5(path, model)
 
         return model
 
@@ -173,7 +179,6 @@ class ChainerModelWrapper(ModelWrapper):
         return load_dataset(self.dataset_name, options=self.args)
 
     def layers(self):
-        # TODO debug!!!!
         if not self._layers:
             for c in self.model.predictor.children():
                 layer = ChainerLayer(c)
@@ -182,7 +187,9 @@ class ChainerModelWrapper(ModelWrapper):
         return self._layers
 
     def save(self):
-        pass
+        if not os.path.isdir(self.model_path):
+            os.makedirs(self.model_path, exist_ok=True)
+        chainer.serializers.save_hdf5(self.saved_model_path, self.model)
 
     def weights(self):
         pass

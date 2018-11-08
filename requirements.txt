@@ -8,3 +8,6 @@ phat
 # Deep learning frameworks
 chainer
 keras
+
+# Julia
+julia

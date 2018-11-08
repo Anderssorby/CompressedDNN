@@ -25,11 +25,11 @@ fi
 MODEL=mnist_vgg2
 EPOCH=1000
 ACTION=train_model
-GPU=0
-PREFIX=small500
+GPU=-1
+PREFIX=unit500
 UNIT=500
 
-python do.py --action ${ACTION} --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU} --epoch ${EPOCH} --unit ${UNIT}
-python do.py --action calc_eigs --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU}
-python do.py --action calc_dof --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU}
-python do.py --action update_architecture --model ${MODEL} --prefix ${PREFIX}
+python do.py --action ${ACTION} --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU} --epoch ${EPOCH} --unit ${UNIT} --new_model=true
+python do.py --action calc_eigs --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU} --unit ${UNIT}
+python do.py --action calc_dof --model ${MODEL} --prefix ${PREFIX} --gpu ${GPU} --unit ${UNIT}
+python do.py --action update_architecture --model ${MODEL} --prefix ${PREFIX} --unit ${UNIT}
