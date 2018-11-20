@@ -202,6 +202,26 @@ def test_model(model_wrapper, args, **kwargs):
     model_wrapper.test(args=args)
 
 
+class ActionManager:
+    """
+    Can manage several consecutive independent actions simplifying the experimental process.
+    """
+
+    def __init__(self, action_list):
+        """
+
+        :param action_list: A list of names of the actions to be performed in order
+        """
+        self.action_list = list(action_list)
+
+    def check_and_execute(self, model_wrapper):
+        for action in self.action_list:
+            # test_action_completed(action)
+            action_function = action_map.get(action)
+            if getattr(action_function, "test_completed", False):
+                action_function(model_wrapper, self.args)
+
+
 action_map = {
     "test_lambda_optimizer": test_lambda_optimizer,
     "range_test": range_test,

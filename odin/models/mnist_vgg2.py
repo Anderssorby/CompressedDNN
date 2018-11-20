@@ -1,4 +1,4 @@
-from odin.models.base import ChainerModelWrapper
+from odin.models.chainer_base import ChainerModelWrapper
 import chainer
 import chainer.functions as F
 import chainer.links as L

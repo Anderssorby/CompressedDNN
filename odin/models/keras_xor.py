@@ -1,7 +1,7 @@
 import numpy as np
 from keras.models import Sequential
 from keras.layers.core import Dense
-from .base import KerasModelWrapper
+from odin.models.keras_base import KerasModelWrapper
 
 
 class KerasXOR(KerasModelWrapper):

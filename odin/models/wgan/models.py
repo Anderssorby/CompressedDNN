@@ -2,7 +2,7 @@ import chainer
 from chainer import functions as F, datasets, optimizers, training
 from chainer import links as L
 
-from odin.models.base import ChainerModelWrapper
+from odin.models.chainer_base import ChainerModelWrapper
 from odin.models.wgan.iterators import RandomNoiseIterator, GaussianNoiseGenerator
 from odin.models.wgan.updater import WassersteinGANUpdater
 from odin.models.wgan.extensions import GeneratorSample

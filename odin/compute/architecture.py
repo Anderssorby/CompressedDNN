@@ -97,9 +97,12 @@ def transfer_to_architecture(model_wrapper, layer_widths, cov_list):
         if layer.type == "fully_connected":
             shape = cov.shape[0]  # layer.out_size
             indexes = np.arange(shape)
+            start_time = time.time()
             j = compute_index_set(cov, m_l, shape, layer.weights)
             co.store_elements(element_name="index_set", elements={"layer_%d" % l: j},
                               model_name=model_wrapper.model_name)
+            elapsed_time = time.time() - start_time
+            logging.info("Computed index set for layer %d in %f" % (l, elapsed_time))
 
             f = np.setdiff1d(indexes, j)
 

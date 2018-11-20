@@ -19,7 +19,7 @@ from multiprocessing import Queue
 
 import odin.plot
 from odin.utils.transformer import Transformer
-from .base import ChainerModelWrapper
+from odin.models.chainer_base import ChainerModelWrapper
 
 
 class VGG2Wrapper(ChainerModelWrapper):

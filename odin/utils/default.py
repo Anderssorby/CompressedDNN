@@ -23,7 +23,7 @@ def prepare_logging(args):
     logging.info(args)
 
 
-def default_chainer():
+def default_arguments_and_behavior():
     """
     Sets up a basic environment for chainer and arguments for most actions
     :return: args, model_wrapper
@@ -31,7 +31,7 @@ def default_chainer():
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", required=False,
                     default="mnist_vgg2", help="model to compress")
-    ap.add_argument("--new_model", required=False, type=bool,
+    ap.add_argument("--new-model", "--new_model", required=False, type=bool,
                     default=False, help="load or start from scratch")
 
     ap.add_argument('--prefix', type=str, default='',

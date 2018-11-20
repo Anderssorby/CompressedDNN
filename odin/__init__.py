@@ -1,17 +1,18 @@
 """
-Odin is a high level framework that enables deep-learning for the brutal age of machine learning.
+Odin is a high level framework that enables deep-learning for the `brutal age` of machine learning.
 It organizes the jungle of frameworks into something that's comprehensible and extendable.
+Specifically it attempts to provide a common language for the different implementations and framework available.
 """
 
-
 import os
+
 VERSION = 0.1
 
 results_dir = os.path.join(os.getcwd(), "results")
 
 model_save_dir = os.path.join(results_dir, "saved_models")
 
-model_wrapper = None
+model_wrapper = None  # For convenience when testing
 
 config = {}
 

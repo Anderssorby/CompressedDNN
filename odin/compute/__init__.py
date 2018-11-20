@@ -1,7 +1,7 @@
 import os
 
 
-_backend_name = os.getenv("ODIN_BACKEND", "chainer")
+_backend_name = os.getenv("ODIN_BACKEND", "numpy")
 
 
 def _load_backend():
@@ -9,8 +9,8 @@ def _load_backend():
         interface = __import__('odin.compute.tf', fromlist=['TensorflowWrapper'])
         _class = getattr(interface, 'TensorflowWrapper')
     else:
-        interface = __import__('odin.compute.chainer', fromlist=['Chainer'])
-        _class = getattr(interface, 'Chainer')
+        interface = __import__('odin.compute.numpy', fromlist=['Numpy'])
+        _class = getattr(interface, 'Numpy')
 
     return _class()
 

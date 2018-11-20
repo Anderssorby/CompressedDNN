@@ -11,16 +11,16 @@ from .base import ComputationInterface
 
 
 # noinspection PyUnresolvedReferences
-class Chainer(ComputationInterface):
+class Numpy(ComputationInterface):
     def __init__(self):
-        super(Chainer, self).__init__()
+        super(Numpy, self).__init__()
 
         self.cuda = None
 
         self.using_gpu = False
 
     def update_args(self, args):
-        super(Chainer, self).update_args(args)
+        super(Numpy, self).update_args(args)
 
         if self.args.gpu >= 0:
             print("Getting GPU")
@@ -37,8 +37,9 @@ class Chainer(ComputationInterface):
     def calc_inter_layer_covariance(self, model_wrapper, use_training_data=False):
 
         model = model_wrapper.model
+        is_chainer = model_wrapper.model_type == "chainer"
 
-        if self.using_gpu:
+        if self.using_gpu and is_chainer:
             model.to_gpu()
 
         xp = self.xp
@@ -50,7 +51,8 @@ class Chainer(ComputationInterface):
         data_size = len(data)
         batch_size = 1000
 
-        model.train = False
+        if is_chainer:
+            model.train = False
 
         perm = xp.random.permutation(data_size)
 
@@ -64,7 +66,7 @@ class Chainer(ComputationInterface):
 
             x = xp.asarray(data[ind_tmp][0], dtype=xp.float32)
 
-            layer_outputs = model.predictor(x, multi_layer=True)
+            layer_outputs = model_wrapper.get_layer_outputs(x)
             for i, layer_out in enumerate(layer_outputs):
                 tmp_mean = xp.mean(layer_out.data, axis=0)
 

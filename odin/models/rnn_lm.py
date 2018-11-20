@@ -18,7 +18,7 @@ from chainer import cuda
 from chainer import training
 from chainer.training import extensions
 
-from odin.models.base import ChainerModelWrapper
+from odin.models.chainer_base import ChainerModelWrapper
 
 
 class RNNForLMWrapper(ChainerModelWrapper):
