@@ -61,7 +61,18 @@ def greedy(constraint, indexes, m_l, parallel=False):
     return selected
 
 
-def compute_index_set(cov, m_l, shape, weights):
+def compute_index_set(layer, cov, m_l, shape, weights, using_jl=False):
+    if using_jl:
+        # Somehow broken
+        print("Enter Julia")
+
+        from julia import Main
+        Main.include("odin/compute/architecture.jl")
+        j = Main.compute_index_set(layer, m_l, None)
+
+        print("Exit julia")
+        return j
+
     indexes = np.arange(shape)
 
     tr = np.trace
@@ -98,9 +109,10 @@ def transfer_to_architecture(model_wrapper, layer_widths, cov_list):
             shape = cov.shape[0]  # layer.out_size
             indexes = np.arange(shape)
             start_time = time.time()
-            j = compute_index_set(cov, m_l, shape, layer.weights)
-            co.store_elements(element_name="index_set", elements={"layer_%d" % l: j},
-                              model_name=model_wrapper.model_name)
+            logging.info("Will Compute index set for layer %d up to size %d" % (l, m_l))
+            j = compute_index_set(l, cov, m_l, shape, layer.weights, using_jl=False)
+            co.store_elements(group_name="index_set", elements={"layer_%d" % l: j},
+                              model_wrapper=model_wrapper)
             elapsed_time = time.time() - start_time
             logging.info("Computed index set for layer %d in %f" % (l, elapsed_time))
 

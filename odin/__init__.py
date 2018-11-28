@@ -24,9 +24,15 @@ def check_or_create_dir(d):
 
 
 def default_save_path(name, category=""):
-    args = [results_dir, model_wrapper.model_name]
-    if model_wrapper.prefix:
-        args.append(model_wrapper.prefix)
+    if not model_wrapper:
+        model_name = "other"
+        args = [results_dir, model_name]
+    else:
+        model_name = model_wrapper.model_name
+
+        args = [results_dir, model_name]
+        if model_wrapper.prefix:
+            args.append(model_wrapper.prefix)
 
     if category:
         args.append(category)

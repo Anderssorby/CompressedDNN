@@ -7,7 +7,6 @@ import os
 import odin.actions
 
 import odin
-from odin.models import load_model
 from odin.compute import default_interface as co
 
 
@@ -28,13 +27,15 @@ def default_arguments_and_behavior():
     Sets up a basic environment for chainer and arguments for most actions
     :return: args, model_wrapper
     """
+    print("----SETUP----")
+
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", required=False,
                     default="mnist_vgg2", help="model to compress")
     ap.add_argument("--new-model", "--new_model", required=False, type=bool,
                     default=False, help="load or start from scratch")
 
-    ap.add_argument('--prefix', type=str, default='',
+    ap.add_argument("-p", '--prefix', type=str, default='',
                     help="An additional label for your model")
 
     ap.add_argument("-a", "--action", dest="action", required=False,
@@ -77,7 +78,7 @@ def default_arguments_and_behavior():
                          '(= length of truncated BPTT)')
 
     # RNN text generation
-    ap.add_argument('--primetext', '-p', type=str, default='',
+    ap.add_argument('--primetext', type=str, default='',
                     help='base text data, used for text generation')
 
     ap.add_argument('--available_cores', type=int, default=4,
@@ -94,6 +95,7 @@ def default_arguments_and_behavior():
     kwargs = vars(args)
     odin.update_config(kwargs)
 
-    model_wrapper = odin.model_wrapper = load_model(args.model, **kwargs)
+    print(args)
+    print("----END-SETUP----")
 
-    return args, model_wrapper
+    return kwargs

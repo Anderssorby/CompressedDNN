@@ -1,5 +1,6 @@
 from abc import abstractmethod
 import os
+import logging
 from odin import results_dir
 from glob import glob
 
@@ -56,3 +57,5 @@ class ComputationInterface(object):
 
         for key in elements:
             self.xp.save(os.path.join(path, key), elements[key])
+
+        logging.info("Stored %s of %s for %s in '%s'" % (elements.keys(), group_name, model_wrapper.model_name, path))

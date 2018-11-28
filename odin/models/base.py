@@ -45,8 +45,8 @@ class ModelWrapper(object):
     def get_group(self, group):
 
         if group not in self._elements.keys():
-            datastore = co.load_group(group_name=group, model_wrapper=self)
-            self._elements[group] = datastore
+            data_store = co.load_group(group_name=group, model_wrapper=self)
+            self._elements[group] = data_store
 
         return self._elements[group]
 
@@ -56,10 +56,6 @@ class ModelWrapper(object):
 
     @abstractmethod
     def load(self, new_model=False):
-        raise NotImplemented
-
-    @abstractmethod
-    def construct(self):
         raise NotImplemented
 
     @abstractmethod
@@ -90,7 +86,7 @@ class ModelWrapper(object):
         raise NotImplemented
 
     @abstractmethod
-    def layers(self):
+    def layers(self) -> [LayerWrapper]:
         raise NotImplemented
 
     @abstractmethod

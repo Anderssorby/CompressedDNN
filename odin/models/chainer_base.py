@@ -9,7 +9,8 @@ from odin.models.base import LayerWrapper, ModelWrapper
 
 class ChainerLayer(LayerWrapper):
     layer_types = {
-        "chainer.links.connection.linear.Linear": "fully_connected"
+        "Linear": "fully_connected",
+        "Conv2D": "convolution_2d"
     }
 
     def __init__(self, layer):
@@ -40,15 +41,16 @@ class ChainerModelWrapper(ModelWrapper):
 
         if not new_model:
             path = os.path.join(self.model_path, self._saved_model_name)
-            model = chainer.serializers.load_hdf5(path, model)
+            chainer.serializers.load_hdf5(path, model)
 
         return model
 
     def load_dataset(self):
         return load_dataset(self.dataset_name, options=self.args)
 
-    def layers(self):
+    def layers(self) -> [ChainerLayer]:
         if not self._layers:
+            self._layers = []
             for c in self.model.predictor.children():
                 layer = ChainerLayer(c)
                 self._layers.append(layer)
@@ -61,7 +63,7 @@ class ChainerModelWrapper(ModelWrapper):
         chainer.serializers.save_hdf5(self.saved_model_path, self.model)
 
     def weights(self):
-        pass
+        return [l.weights for l in self.layers()]
 
     def get_layer_outputs(self, x):
         return self.model.predictor(x, multi_layer=True)

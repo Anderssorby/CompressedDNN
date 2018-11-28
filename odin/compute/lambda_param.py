@@ -82,11 +82,11 @@ class LambdaOptimizer:
         # self.layer_widths = None
         self.current_result = None
         if self.model_wrapper.model_type == "keras":
-            self.num_layers = len(self.model.layers) - 1
+            self.num_layers = len(self.model.layers()) - 1
             self.initial_widths = np.zeros(self.num_layers)
         elif self.model_wrapper.model_type == "chainer":
             layers = self.model_wrapper.layers()
-            self.initial_widths = np.array([l.out_size for l in layers])
+            self.initial_widths = np.array([l.units for l in layers])
             self.num_layers = len(self.model_wrapper.layers()) - 1  # Do not include the last layer
 
     def objective_function(self, lamb):

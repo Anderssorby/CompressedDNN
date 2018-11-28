@@ -47,7 +47,7 @@ class Cifar10CNN(KerasModelWrapper):
 
         batch_size = options.get("batch_size", 32)
         epochs = options.get("epochs", 100)
-        data_augmentation = options.get("data_augmentation", True)
+        data_augmentation = options.get("data_augmentation", False)
 
         (x_train, y_train), (x_test, y_test) = self.load_dataset()
         print('x_train shape:', x_train.shape)
@@ -106,7 +106,7 @@ class Cifar10CNN(KerasModelWrapper):
                 # set function that will be applied on each input
                 preprocessing_function=None,
                 # image data format, either "channels_first" or "channels_last"
-                data_format=None,
+                data_format="channels_last",
                 # fraction of images reserved for validation (strictly between 0 and 1)
                 validation_split=0.0)
 

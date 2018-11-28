@@ -37,20 +37,10 @@ class KerasModelWrapper(ModelWrapper):
             return keras.models.load_model(self.saved_model_path)
 
     def save(self):
-        if not os.path.isdir(odin.model_save_dir):
-            os.makedirs(odin.model_save_dir)
+        if not os.path.isdir(self.model_path):
+            os.makedirs(self.model_path)
         self.model.save(self.saved_model_path)
 
-        # def get_nth_layer_output(self, n, batch):
-        #    if self.model_type == "keras":
-        # intermediate_layer_model = Model(inputs=model.input,
-        #                                 outputs=layer.output)
-        # output = intermediate_layer_model.predict(batch)
-        # layer_output = K.function([self.model.layers[0].input],
-        #                          [self.model.layers[n].output])
-        # output = layer_output([batch])[0]
-
-        # return output
     def get_nth_layer_output(self, n, x):
         out_function = K.function([self.model.layers[0].input],
                                           [self.model.layers[n].output])
