@@ -20,6 +20,7 @@ from six.moves import cPickle as pickle
 from skimage.io import imsave
 
 from odin.utils.transformer import Transformer
+from odin.utils.generate import *
 
 data_dir = "data"
 
@@ -219,10 +220,29 @@ class PTBWords(Dataset):
         return train, val, test
 
 
+class Mini(Dataset):
+    name = "mini"
+
+    def load(self):
+        file = os.path.join(data_dir, "mini.npy")
+        if not os.path.isfile(file):
+            train, test = generate_dataset()
+
+            if not os.path.isdir(data_dir):
+                os.mkdir(data_dir)
+
+            np.save(file, (train, test))
+        else:
+            train, test = np.load(file)
+
+        return train, test
+
+
 datasets = {
     "cifar-10": Cifar_10,
     "mnist": MNIST,
-    "ptb_words": PTBWords
+    "ptb_words": PTBWords,
+    "mini": Mini
 }
 
 if __name__ == "__main__":

@@ -41,7 +41,12 @@ class Cifar10CNN(KerasModelWrapper):
         return model
 
     def load_dataset(self):
-        return cifar10.load_data()
+        (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+
+        y_train = keras.utils.to_categorical(y_train, self.num_classes)
+        y_test = keras.utils.to_categorical(y_test, self.num_classes)
+
+        return (x_train, y_train), (x_test, y_test)
 
     def train(self, x_train=None, y_train=None, **options):
 
@@ -53,10 +58,6 @@ class Cifar10CNN(KerasModelWrapper):
         print('x_train shape:', x_train.shape)
         print(x_train.shape[0], 'train samples')
         print(x_test.shape[0], 'test samples')
-
-        # Convert class vectors to binary class matrices.
-        y_train = keras.utils.to_categorical(y_train, self.num_classes)
-        y_test = keras.utils.to_categorical(y_test, self.num_classes)
 
         # initiate RMSprop optimizer
         opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)

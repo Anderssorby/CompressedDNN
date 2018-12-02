@@ -31,15 +31,18 @@ class MLP(chainer.Chain):
 
 
 class MNISTWrapper(ChainerModelWrapper):
-
     dataset_name = "mnist"
     model_name = "mnist_vgg2"
 
     def train(self, x_train=None, y_train=None, **options):
-        args = options.get("args")
-        if args.gpu >= 0:
+        gpu = options.get("gpu")
+        epoch = options.get("epoch")
+        batch_size = options.get("batch_size", 128)
+        frequency = options.get("frequency")
+
+        if gpu >= 0:
             # Make a specified GPU current
-            chainer.backends.cuda.get_device_from_id(args.gpu).use()
+            chainer.backends.cuda.get_device_from_id(gpu).use()
             self.model.to_gpu()  # Copy the model to the GPU
 
         # Setup an optimizer
@@ -49,25 +52,25 @@ class MNISTWrapper(ChainerModelWrapper):
         # Load the MNIST dataset
         train, test = self.dataset
 
-        train_iter = chainer.iterators.SerialIterator(train, args.batchsize)
-        test_iter = chainer.iterators.SerialIterator(test, args.batchsize,
+        train_iter = chainer.iterators.SerialIterator(train, batch_size)
+        test_iter = chainer.iterators.SerialIterator(test, batch_size,
                                                      repeat=False, shuffle=False)
 
         # Set up a trainer
         updater = training.StandardUpdater(
-            train_iter, optimizer, device=args.gpu)
+            train_iter, optimizer, device=gpu)
         output = self.model_path
-        trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=output)
+        trainer = training.Trainer(updater, (epoch, 'epoch'), out=output)
 
         # Evaluate the model with the test dataset for each epoch
-        trainer.extend(extensions.Evaluator(test_iter, self.model, device=args.gpu))
+        trainer.extend(extensions.Evaluator(test_iter, self.model, device=gpu))
 
         # Dump a computational graph from 'loss' variable at the first iteration
         # The "main" refers to the target link of the "main" optimizer.
         trainer.extend(extensions.dump_graph('main/loss'))
 
         # Take a snapshot for each specified epoch
-        frequency = args.epoch if args.frequency == -1 else max(1, args.frequency)
+        frequency = epoch if frequency == -1 else max(1, frequency)
         trainer.extend(extensions.snapshot(), trigger=(frequency, 'epoch'))
 
         # Write a log of evaluation statistics for each epoch
@@ -75,7 +78,7 @@ class MNISTWrapper(ChainerModelWrapper):
 
         trainer.extend(report)
 
-        plot = options.get("plot", getattr(args, "plot", None))
+        plot = options.get("plot")
         # Save two plot images to the result dir
         if plot and extensions.PlotReport.available():
             trainer.extend(
@@ -98,10 +101,9 @@ class MNISTWrapper(ChainerModelWrapper):
         # Print a progress bar to stdout
         trainer.extend(extensions.ProgressBar())
 
-        resume = options.get("resume", getattr(args, "resume", None))
+        resume = options.get("resume", None)
         if resume:
-            # Resume from a snapshot
-            chainer.serializers.load_npz(args.resume, trainer)
+            chainer.serializers.load_npz(resume, trainer)
 
         # Run the training
         trainer.run()
@@ -115,35 +117,3 @@ class MNISTWrapper(ChainerModelWrapper):
         l1, l2 = kwargs.get("layer_widths", (unit, unit))
         model = L.Classifier(MLP(l1, l2, 10))
         return model
-
-
-def main():
-    parser = argparse.ArgumentParser(description='')
-    parser.add_argument('--batchsize', '-b', type=int, default=100,
-                        help='Number of images in each mini-batch')
-    parser.add_argument('--epoch', '-e', type=int, default=20,
-                        help='Number of sweeps over the dataset to train')
-    parser.add_argument('--frequency', '-f', type=int, default=-1,
-                        help='Frequency of taking a snapshot')
-    parser.add_argument('--gpu', '-g', type=int, default=-1,
-                        help='GPU ID (negative value indicates CPU)')
-    parser.add_argument('--resume', '-r', default='',
-                        help='Resume the training from snapshot')
-    parser.add_argument('--unit', '-u', type=int, default=1000,
-                        help='Number of units')
-    parser.add_argument('--noplot', dest='plot', action='store_false',
-                        help='Disable PlotReport extension')
-    args = parser.parse_args()
-
-    print('GPU: {}'.format(args.gpu))
-    print('# unit: {}'.format(args.unit))
-    print('# Minibatch-size: {}'.format(args.batchsize))
-    print('# epoch: {}'.format(args.epoch))
-    print('')
-
-    mw = MNISTWrapper(args=args)
-    mw.train(args=args)
-
-
-if __name__ == "__main__":
-    main()

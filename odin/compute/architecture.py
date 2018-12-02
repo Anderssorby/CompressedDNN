@@ -7,7 +7,7 @@ import time
 import numpy as np
 import numpy.linalg as LA
 import logging
-
+from progress.bar import ChargingBar
 import odin
 import odin.plot as oplt
 from odin.compute import default_interface as co
@@ -28,8 +28,10 @@ def greedy(constraint, indexes, m_l, parallel=False):
     selected = np.array([])
     plot = False
     choices = np.array(indexes)
+    bar = ChargingBar("Calculating index set with greedy method", max=m_l)
+
     for i in range(len(selected), m_l):
-        print("i = %d" % i)
+        # print("i = %d" % i)
         start = time.time()
 
         def calc(node):
@@ -57,6 +59,8 @@ def greedy(constraint, indexes, m_l, parallel=False):
         choices = np.setdiff1d(choices, [greedy_choice])
         logging.debug("selected = %s; choice = %s; time = %.5f" % (
             selected, greedy_choice, time.time() - start))
+        bar.next()
+    bar.finish()
 
     return selected
 
@@ -78,6 +82,7 @@ def compute_index_set(layer, cov, m_l, shape, weights, using_jl=False):
     tr = np.trace
     theta = 0.5
     W = weights
+
     # R_z = W.T.dot(np.linalg.pinv(W.dot(W.T))).dot(W)
 
     def obj(j):
@@ -94,7 +99,9 @@ def compute_index_set(layer, cov, m_l, shape, weights, using_jl=False):
         normalizer = tr(ch.dot(cov[np.ix_(f, f)]))
         return difference / normalizer
 
-    j, score = greedy(obj, indexes, m_l, parallel=True)
+    j = greedy(obj, indexes, m_l, parallel=True)
+
+    j = j.astype(dtype=int)
 
     return j
 
@@ -119,12 +126,14 @@ def transfer_to_architecture(model_wrapper, layer_widths, cov_list):
             f = np.setdiff1d(indexes, j)
 
             _I_w = np.eye(m_l) * regularizer_w
-            conversion_matrix = cov[np.ix_(f, j)] / (cov[np.ix_(j, j)] + _I_w)
-            new_weights = conversion_matrix.dot(layer.weights)
+            conversion_matrix = cov[np.ix_(f, j)].dot(LA.inv(cov[np.ix_(j, j)] + _I_w))
+            sub_weights = layer.weights[:, j]
+            new_weights = sub_weights  # conversion_matrix.dot()
             weights.append(new_weights)
-            biases.append(layer.biases)
+            biases.append(layer.biases[j])
 
-    new_wrapper = model_wrapper.__class__(layer_widths=layer_widths, prefix=(model_wrapper.prefix + "_compressed"))
+    new_wrapper = model_wrapper.__class__(layer_widths=layer_widths, wheights=weights, biases=biases,
+                                          prefix=(model_wrapper.prefix + "_compressed"))
 
     return new_wrapper
 

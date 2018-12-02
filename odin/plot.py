@@ -1,5 +1,4 @@
 import os
-import re
 
 import matplotlib as mat
 if os.getenv("DISPLAY") is None:
@@ -9,6 +8,11 @@ from matplotlib import pyplot as plt
 from matplotlib.pyplot import *
 
 import odin
+from matplotlib import rc
+
+# Use LaTex
+rc('text', usetex=True)
+rc('font', family='serif')
 
 
 def plot_eigen_values(eigen_values, title=""):
@@ -33,6 +37,25 @@ def plot_line(x, y, title=""):
     plt.title(title)
     plt.draw()
     return fig
+
+
+def plot_model_history(model_wrapper):
+    history = model_wrapper.get_group("training_history")["history"]
+    plt.figure()
+    plt.plot(history['binary_accuracy'])
+    # plt.plot(history.history['val_acc'])
+    plt.title('Model accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+
+    plt.figure()
+    plt.plot(history['loss'])
+    # plt.plot(history.history['val_loss'])
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
 
 
 def labels(x_label, y_label):

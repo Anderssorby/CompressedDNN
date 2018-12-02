@@ -1,4 +1,5 @@
 import logging
+from progress.bar import ChargingBar
 
 import odin
 from odin import plot as oplt
@@ -48,19 +49,22 @@ def update_architecture(**kwargs):
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
 
     method = "Newton-CG"
-    r_dof = model_wrapper.get_group("range_dof_%s" % method)
-    bounds = r_dof["bounds"]
-    layer_widths_list = r_dof["layer_widths"]
-    lambdas = r_dof["lambdas"]
+    r_dof = model_wrapper.get_group("range_test")
+    # bounds = r_dof["rho_range"]
+    layer_widths_list = r_dof["all_layer_widths"]
+    # lambdas = r_dof["all_lambdas"]
 
-    datastore = model_wrapper.get_group("inter_layer_covariance")
-    cov_list = datastore["cov"]
-    eigen_values = datastore["eigen_values"]
+    data = model_wrapper.get_group("inter_layer_covariance")
+    cov_list = data["cov"]
+    # eigen_values = data["eigen_values"]
 
     loss_before = []
     loss_after = []
+    num = kwargs.get("num") or 1
 
-    layer_widths = layer_widths_list[1]
+    layer_widths = layer_widths_list[num]  # TODO this is not what we want
+    logging.info("Finding the new architecture for %s" % layer_widths)
+    print("Finding the new architecture for %s" % layer_widths)
 
     new_model = architecture.transfer_to_architecture(model_wrapper=model_wrapper, layer_widths=layer_widths,
                                                       cov_list=cov_list)
@@ -154,7 +158,7 @@ def plot_dof(**kwargs):
 
 def range_test(**kwargs):
     """
-
+    Test LambdaOptimizer over a range
 
     :param kwargs:
     :return:
@@ -163,10 +167,60 @@ def range_test(**kwargs):
 
     l_opt = lambda_param.LambdaOptimizer(model_wrapper)
 
-    bounds = [0.1, 0.5, 1, 2, 5, 10]
-    for bound in bounds:
-        lambdas, layer_widths = l_opt.optimize(bound=bound)
-        print("bound=", bound, layer_widths, lambdas)
+    method = "Newton-CG"
+    num = kwargs.get("num") or 1000
+    max_rho = kwargs.get("max") or 0.15
+
+    regularizing = kwargs.get("regularizing")
+
+    rho_range = co.xp.linspace(0.01, max_rho, num=num)
+    all_lambdas = []
+    all_layer_widths = []
+    bar = ChargingBar("Testing a range of rho on LambdaOptimizer", max=num)
+    for rho in rho_range:
+        lambdas, layer_widths = l_opt.optimize(rho=rho, method=method, debug=False, regularizing=regularizing)
+        if kwargs['verbose']:
+            print("rho=", rho, layer_widths, lambdas)
+        all_lambdas.append(lambdas)
+        all_layer_widths.append(layer_widths)
+        bar.next()
+    bar.finish()
+
+    return co.store_elements(model_wrapper=model_wrapper, group_name="range_test",
+                             elements={"rho_range": rho_range, "all_lambdas": all_lambdas,
+                                       "all_layer_widths": all_layer_widths})
+
+
+def range_test_plot(**kwargs):
+    """
+    Plot the result of range test
+    dependency: range_test
+
+    :param kwargs:
+    :return:
+    """
+    model_wrapper = load_model(kwargs.get("model"), **kwargs)
+    data = model_wrapper.get_group("range_test")
+    rho_range = data["rho_range"]
+    all_lambdas = data["all_lambdas"]
+    all_layer_widths = data["all_layer_widths"]
+
+    n_layers = len(all_lambdas)
+
+    fig = oplt.figure()
+    # oplt.suptitle(r"Different layer widths for $\rho \in [0.01,0.15]$")
+    oplt.subplot(2, 1, 1)
+    oplt.plot(rho_range, all_lambdas)
+    oplt.labels(r"$\rho$", "$\lambda_{\ell}$")
+    oplt.legend([r"$\lambda_{%d}$" % l for l in range(n_layers)])
+    oplt.subplot(2, 1, 2)
+    oplt.plot(rho_range, all_layer_widths)
+    oplt.labels(r"$\rho$", "$\hat{m}_{\ell}$")
+    oplt.legend([r"$\hat{m}_{%d}$" % l for l in range(n_layers)])
+    oplt.save("range_test")
+    oplt.show()
+
+    return fig
 
 
 def calc_eigs(**kwargs):
@@ -179,19 +233,20 @@ def calc_eigs(**kwargs):
     """
     model_wrapper = odin.model_wrapper = load_model(kwargs.get("model"), **kwargs)
 
-    co.calc_inter_layer_covariance(model_wrapper=model_wrapper)
+    co.calc_inter_layer_covariance(model_wrapper=model_wrapper, **kwargs)
 
     datastore = model_wrapper.get_group("inter_layer_covariance")
     cov = datastore["cov"]
     eigen_values = datastore["eigen_values"]
 
-    for i, eigs in enumerate(eigen_values):
-        l = len(eigs)
-        eigs = abs(eigs)
-        oplt.plot_eigen_values(eigs, title="%s layer %d (%d)" % (model_wrapper.model_name, i, l))
-        oplt.save("eigs(%d)" % i)
-        oplt.plot_matrix(cov[i], title="Covariance (%d)" % i)
-        oplt.save("cov(%d)" % i)
+    if kwargs["plot"]:
+        for i, eigs in enumerate(eigen_values):
+            l = len(eigs)
+            eigs = abs(eigs)
+            oplt.plot_eigen_values(eigs, title="%s layer %d (%d)" % (model_wrapper.model_name, i, l))
+            oplt.save("eigs(%d)" % i)
+            oplt.plot_matrix(cov[i], title="Covariance (%d)" % i)
+            oplt.save("cov(%d)" % i)
 
     return cov, eigen_values
 
@@ -208,6 +263,15 @@ def train_model(**kwargs):
     model_wrapper.train(**kwargs)
     model_wrapper.save()
 
+    if model_wrapper.history:
+        model_wrapper.put_group("training_history", {"history": model_wrapper.history.history})
+        if kwargs["plot"]:
+            oplt.plot_model_history(model_wrapper)
+            oplt.save("loss")
+            oplt.show()
+
+    return model_wrapper
+
 
 def test_model(**kwargs):
     """
@@ -218,7 +282,7 @@ def test_model(**kwargs):
     """
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
 
-    model_wrapper.test(**kwargs)
+    return model_wrapper.test(**kwargs)
 
 
 class ActionManager:
@@ -244,11 +308,13 @@ class ActionManager:
 action_map = {
     "test_lambda_optimizer": test_lambda_optimizer,
     "range_test": range_test,
+    "range_test_plot": range_test_plot,
     "plot_dof": plot_dof,
     "calc_dof": calc_dof,
     "calc_eigs": calc_eigs,
     "train_model": train_model,
     "measure_goodness": measure_goodness,
     "update_architecture": update_architecture,
+    "up_arch": update_architecture,
     "": test_lambda_optimizer
 }

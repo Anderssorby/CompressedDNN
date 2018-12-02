@@ -1,92 +1,88 @@
 from .base import ComputationInterface
+from progress.bar import ChargingBar
+import numpy as np
 import tensorflow as tf
-from keras import backend as K
-from keras.models import Model
 import os
-import logging
-from scipy.sparse import lil_matrix, csr_matrix
-
-
-accepted_layers = ['Dense', 'Conv2D', 'Conv1D']
 
 
 class TensorflowWrapper(ComputationInterface):
 
-    @staticmethod
-    def compute_covariance_matrix(model, layer, batch):
-        intermediate_layer_model = Model(inputs=model.input,
-                                         outputs=layer.output)
-        output = intermediate_layer_model.predict(batch)
-        flat_shape = output[0].flatten().shape[0]
-        sigma = lil_matrix((flat_shape, flat_shape))
-        n = len(batch)
-        for i in range(n):
-            g = output[i].flatten()
-            sigma += np.outer(g, g)
-        sigma = 1 / (n - 1) * sigma
-        return csr_matrix.todense(sigma)
+    def load_elements(self, group_name, model_wrapper):
+        save_path = os.path.join(model_wrapper.model_path, group_name, "saved.ckpt")
+        if not os.path.isdir(save_path):
+            os.makedirs(save_path)
 
-    def calc_inter_layer_covariance(self, model_wrapper):
-        model = model_wrapper.model
+        with tf.Session() as session:
 
-        path = os.path.join(self.saving_dir, model.model_name)
-        if not os.path.isdir(path):
-            os.makedirs(path)
-        file_start = os.path.join(path, self.args.file_prefix)
-        saver = tf.train.Saver()
-        for n, layer in enumerate(self.model.layers):
-            if layer.__class__.__name__ not in accepted_layers:
-                logging.info("Skipping...", layer)
-                continue
-            save_path = file_start + ".%d.ckpt" % n
-            with tf.Session() as session:
-                sigma_file = file_start + ".cov.%d.ckpt" % n
-                if not os.path.isfile(sigma_file):
-                    session = tf.Session()
-                    sigma = self.compute_covariance_matrix_with_tf(model, layer, model_wrapper.x_train[:100])
-                    session.run(sigma)
-                    # saver.save(session, sigma_file)
-                    # np.save(sigma_file, sigma)
-                    # else:
+            saver = tf.train.Saver()
 
-                    # eig_file = file_start + ".eig.%d.ckpt" % n
-                    # if not os.path.isfile(eig_file):
-                    session = tf.Session()
-                    eigen_values = tf.self_adjoint_eigvals(sigma)
-                    session.run(sigma)
-                    # saver.save(session, eig_file)
+            saver.restore(session, save_path)
 
-                    # eigen_values, eigen_vectors = np.linalg.eig(sigma)
-                    # eigen_values = eigen_values[eigen_values != 0]
-                    # eigen_values.sort()
-                    # np.save(eig_file, eigen_values)
+    def store_elements(self, elements, group_name, model_wrapper, use_saver=False):
+        if not use_saver:
+            super(TensorflowWrapper, self).store_elements(elements=elements, group_name=group_name,
+                                                          model_wrapper=model_wrapper)
 
-                    saver.save(session, save_path)
+        save_path = os.path.join(model_wrapper.model_path, group_name, "saved.ckpt")
+        if not os.path.isdir(save_path):
+            os.makedirs(save_path)
+
+        with tf.Session() as session:
+            for name, var in elements.items():
+                if not isinstance(var, tf.Variable):
+                    elements[name] = tf.Variable(var)
                 else:
-                    # eigen_values = np.load(eig_file)
-                    saver.restore(session, save_path)
-                    sigma = tf.get_variable("sigma")
-                    eigen_values = tf.get_variable("eigen_values")
-                sigma.eval()
-                eigen_values.eval()
+                    var.initializer.run()
+                    var.op.run()
+            saver = tf.train.Saver(elements)
 
-    @staticmethod
-    def compute_covariance_matrix_with_tf(model, layer, batch):
-        # intermediate_layer_model = Model(inputs=model.input,
-        #                                 outputs=layer.output)
-        # output = intermediate_layer_model.predict(batch)
-        layer_output = K.function([model.layers[0].input],
-                                  [layer.output])
-        output = layer_output([batch])[0]
-        flat_shape = output[0].flatten().shape[0]
-        # TODO handle
-        sigma = tf.zeros(shape=(flat_shape, flat_shape), dtype=tf.float32, name="sigma")
-        n = len(batch)
+            saver.save(session, save_path)
+        return elements
 
-        for i in range(n):
-            g = tf.constant(output[i].flatten())
-            sigma += tf.einsum('i,j->ij', g, g)
-            # sigma += np.outer(g, g)
-        # sigma = 1 / (n - 1) * sigma
-        sigma = 1 / (n - 1) * sigma
-        return sigma
+    def calc_inter_layer_covariance(self, model_wrapper, use_training_data=True, batch_size=-1, **options):
+        is_chainer = model_wrapper.model_type == "chainer"
+
+        train, test = model_wrapper.dataset
+
+        data_x = train if use_training_data else test
+
+        if is_chainer:
+            data_x = np.moveaxis(data_x, -1, 0)[0]
+        else:
+            data_x = data_x[0]
+
+        data_x = np.stack(data_x, axis=0)
+        data_size = n = len(data_x)
+
+        if batch_size > 0:
+            perm = np.random.permutation(data_size)
+            data_x = data_x[perm[0:batch_size]]
+            n = batch_size
+
+        n_layers = len(model_wrapper.layers())
+        bar = ChargingBar("Calculating inter layer covariance", max=n_layers)
+
+        layer_outputs = model_wrapper.get_layer_outputs(data_x)
+        to_save = {}
+
+        for l, layer_output in enumerate(layer_outputs):
+            if is_chainer:
+                layer_output = layer_output.data
+            flat_shape = layer_output[0].flatten().shape[0]
+
+            sigma = tf.zeros(shape=(flat_shape, flat_shape), dtype=tf.float32, name="sigma%d" % l)
+
+            for output in layer_output:
+                g = tf.constant(output.flatten())
+                sigma += tf.einsum('i,j->ij', g, g)
+
+            sigma = tf.Variable(1 / (n - 1) * sigma, name="sigma%d" % l)
+
+            eigen_values = tf.self_adjoint_eigvals(sigma, name="eigen_values%d" % l)
+            to_save["sigma%d" % l] = sigma
+            to_save["eigen_values%d" % l] = tf.Variable(eigen_values)
+
+        bar.next()
+
+        self.store_elements(group_name="inter_layer_covariance",
+                            elements=to_save, model_wrapper=model_wrapper)

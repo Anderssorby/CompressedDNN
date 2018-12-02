@@ -65,29 +65,27 @@ def generate_n_sphere_points(r, n, num=100):
 
 
 class LambdaOptimizer:
-    def __init__(self, model_wrapper):
+    current_result = None
+
+    def __init__(self, model_wrapper, sanitize_eigs=False):
         self.model_wrapper = model_wrapper
 
         eig_rows = model_wrapper.get_element("inter_layer_covariance", "eigen_values")
         # remove negative eigenvalues
-        epsilon = 1
-        for i, eigs in enumerate(eig_rows):
-            eigs[eigs < epsilon] = epsilon
+        if sanitize_eigs:
+            epsilon = 1
+            for i, eigs in enumerate(eig_rows):
+                eigs[eigs < epsilon] = epsilon
+        # no imaginary part
         eig_rows = np.abs(eig_rows)
 
         self.layer_eigen_values = eig_rows
 
         self.model = model_wrapper.model
-        # self.lambdas = None
-        # self.layer_widths = None
-        self.current_result = None
-        if self.model_wrapper.model_type == "keras":
-            self.num_layers = len(self.model.layers()) - 1
-            self.initial_widths = np.zeros(self.num_layers)
-        elif self.model_wrapper.model_type == "chainer":
-            layers = self.model_wrapper.layers()
-            self.initial_widths = np.array([l.units for l in layers])
-            self.num_layers = len(self.model_wrapper.layers()) - 1  # Do not include the last layer
+
+        layers = self.model_wrapper.layers()
+        self.initial_widths = np.array([l.units for l in layers])
+        self.num_layers = len(self.model_wrapper.layers()) - 1  # Do not include the last layer
 
     def objective_function(self, lamb):
         last = self.degree_of_freedom(lamb=lamb[0], layer=0)
@@ -157,7 +155,7 @@ class LambdaOptimizer:
         def lagr_obj(x):
             obj(x ** 2) + rho * np.sum(x)
 
-        result = opt.minimize(self.objective_function, lamb0,
+        result = opt.minimize(lagr_obj, lamb0,
                               constraints=[constraint] + zero_constraints,
                               bounds=bounds,
                               method='SLSQP',
@@ -176,24 +174,36 @@ class LambdaOptimizer:
 
         return result
 
-    def _optimize_newton_cg(self, rho=1):
+    def _optimize_newton_cg(self, rho=1, debug=False, regularizing="sq"):
         obj = self.objective_function
         n = self.num_layers
         ones = np.ones(n)
         lamb0 = ones * 0.1
 
+        def abs_regularizer(x): return np.sum(np.abs(x))
+
+        def sq_regularizer(x): return np.sum(np.square(x))
+
+        regularizer = sq_regularizer if regularizing == "sq" else abs_regularizer
+
+        def abs_regularizer_diff(x): return np.sign(x)
+
+        def sq_regularizer_diff(x): return 2*np.sum(x)
+
+        regularizer_diff = sq_regularizer_diff if regularizing == "sq" else abs_regularizer_diff
+
         def lagrangian(x):
-            return obj(x ** 2) + rho * np.sum(x)
+            return obj(x ** 2) + rho * regularizer(x)
 
         jacobian = self.jacobian
 
         def jac(x):
-            return 2 * x * jacobian(x ** 2) + rho * ones
+            return 2 * x * jacobian(x ** 2) + rho * regularizer_diff(x)
 
         result = opt.minimize(lagrangian, lamb0,
                               jac=jac,
                               method='Newton-CG',
-                              options={"disp": True})
+                              options={"disp": debug})
 
         return result
 
@@ -201,18 +211,18 @@ class LambdaOptimizer:
         dof = self.degree_of_freedom
         if method == "SLSQP":
             result = self._optimize_SLSQP(**kwargs)
-            lambdas = result.x
+            lambdas = np.square(result.x)
 
         elif method == "Newton-CG":
             result = self._optimize_newton_cg(**kwargs)
-            lambdas = np.sqrt(result.x)
+            lambdas = np.square(result.x)
         else:
             raise ValueError("Unkown method %s" % method)
 
         logging.debug(str(result))
 
         layer_widths = [dof(lamb, layer) for layer, lamb in enumerate(lambdas)]
-        layer_widths = np.int32(np.floor(layer_widths))
+        layer_widths = np.int32(np.ceil(layer_widths))
 
         self.current_result = result
         if not result.success:
@@ -232,7 +242,7 @@ class LambdaOptimizer:
         l_arr = []
 
         for bound in sphere:
-            lambdas, _ = self.optimize(bound=bound, debug=False)
+            lambdas, _ = self.optimize(bound=bound, debug=False, method="Newton-CG")
             l_arr.append(lambdas)
 
         layer_widths = np.array([self.calc_layer_widths(lambdas) for lambdas in sphere])
@@ -240,8 +250,6 @@ class LambdaOptimizer:
         return sphere, layer_widths
 
     def range_lambda_dof(self, line, method="SLSQP"):
-        n = self.num_layers
-
         l_arr = []
         layer_widths = []
         success = []

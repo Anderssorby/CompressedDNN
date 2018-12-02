@@ -35,7 +35,7 @@ def default_arguments_and_behavior():
     ap.add_argument("--new-model", "--new_model", required=False, type=bool,
                     default=False, help="load or start from scratch")
 
-    ap.add_argument("-p", '--prefix', type=str, default='',
+    ap.add_argument("-p", '--prefix', type=str, default='default',
                     help="An additional label for your model")
 
     ap.add_argument("-a", "--action", dest="action", required=False,
@@ -44,17 +44,30 @@ def default_arguments_and_behavior():
     ap.add_argument("-f", "--file-prefix", required=False,
                     default="save", help="prefix for the files of computed values")
     ap.add_argument('--gpu', type=int, default=-1)
-    ap.add_argument('--epoch', type=int, default=100)
-    ap.add_argument('--batchsize', type=int, default=128)
+    ap.add_argument('--epochs', type=int, default=200)
+    ap.add_argument('--batch_size', type=int, required=False)
     ap.add_argument('--snapshot', type=int, default=10)
-    ap.add_argument('--datadir', type=str, default='../data')
     ap.add_argument('-n', "--no-large-files", type=bool, default=False,
                     help="To prevent out of memory on test run")
     ap.add_argument("--ask", "--prompt", type=bool, dest="prompt", default=True,
                     help="Whether to ask before downloading.")
 
+    # Model options
     ap.add_argument('--unit', '-u', type=int, default=1000,
                     help='Number of units')
+    ap.add_argument("--use_bias", "--use-bias", required=False, type=bool,
+                    default=False, help="Use a bias vector")
+
+    ap.add_argument('--max', type=float, required=False,
+                    help='Maximum; action specific.')
+    ap.add_argument('--num', type=int, required=False,
+                    help='Count; action specific.')
+
+    # Plot and print
+    ap.add_argument("--plot", type=bool, dest="plot", default=True,
+                    help="Plot the results.")
+    ap.add_argument("-v", "--verbose", type=bool, dest="verbose", default=False,
+                    help="Print detailed information. May slow down execution.")
 
     # optimization
     ap.add_argument('--opt', type=str, default='MomentumSGD',
@@ -68,14 +81,14 @@ def default_arguments_and_behavior():
     ap.add_argument('--seed', type=int, default=1701)
     ap.add_argument('--frequency', type=int, default=-1)
 
-    ap.add_argument('--test', action='store_true',
-                    help='Use tiny datasets for quick tests')
     ap.add_argument('--gradclip', '-c', type=float, default=5,
                     help='Gradient norm threshold to clip')
 
     ap.add_argument('--bproplen', '-l', type=int, default=35,
                     help='Number of words in each mini-batch '
                          '(= length of truncated BPTT)')
+    ap.add_argument('--regularizing', type=str, default="sq", choices=["sq", "abs"],
+                    help="Which regularizer to use in lambda optimizer")
 
     # RNN text generation
     ap.add_argument('--primetext', type=str, default='',
@@ -95,7 +108,7 @@ def default_arguments_and_behavior():
     kwargs = vars(args)
     odin.update_config(kwargs)
 
-    print(args)
+    print(kwargs)
     print("----END-SETUP----")
 
     return kwargs

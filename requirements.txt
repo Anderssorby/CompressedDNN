@@ -1,6 +1,9 @@
 scipy
+matplotlib
 numpy
 scikit-image
+progress
+pydot
 
 # Homology computation
 phat
@@ -8,6 +11,7 @@ phat
 # Deep learning frameworks
 chainer
 keras
+tensorflow
 
 # Julia
 julia

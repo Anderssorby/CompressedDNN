@@ -27,17 +27,6 @@ class ChainerModelWrapper(ModelWrapper):
 
     def load(self, new_model=False):
         model = self.construct(**self.args)
-        snapshot = None
-
-        if os.path.isdir(self.model_path):
-            file_filter = os.path.join(self.model_path, "snapshot_iter_*")
-            snapshots = glob.glob(file_filter)
-            if snapshots:
-                snapshot = snapshots[-1]
-            else:
-                new_model = True
-        else:
-            new_model = True
 
         if not new_model:
             path = os.path.join(self.model_path, self._saved_model_name)
@@ -48,8 +37,8 @@ class ChainerModelWrapper(ModelWrapper):
     def load_dataset(self):
         return load_dataset(self.dataset_name, options=self.args)
 
-    def layers(self) -> [ChainerLayer]:
-        if not self._layers:
+    def layers(self, force_update=False) -> [ChainerLayer]:
+        if force_update or not self._layers:
             self._layers = []
             for c in self.model.predictor.children():
                 layer = ChainerLayer(c)

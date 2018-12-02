@@ -1,7 +1,6 @@
 from abc import abstractmethod
 import os
 import logging
-from odin import results_dir
 from glob import glob
 
 
@@ -27,14 +26,14 @@ class ComputationInterface(object):
         """
         pass
 
-    def load_group(self, group_name, model_wrapper):
+    def load_elements(self, group_name, model_wrapper):
         """
         Load a group of previously computed values.
         :param group_name: directory where the elements are placed
         :param model_wrapper:
         :return:
         """
-        path = os.path.join(results_dir, model_wrapper.model_name, group_name, "*.npy")
+        path = os.path.join(model_wrapper.model_path, group_name, "*.npy")
         group = {}
         for f in glob(path):
             element = self.xp.load(f)
@@ -51,7 +50,7 @@ class ComputationInterface(object):
         :param model_wrapper:
         :return:
         """
-        path = os.path.join(results_dir, model_wrapper.model_name, group_name)
+        path = os.path.join(model_wrapper.model_path, group_name)
         if not os.path.isdir(path):
             os.makedirs(path)
 
@@ -59,3 +58,4 @@ class ComputationInterface(object):
             self.xp.save(os.path.join(path, key), elements[key])
 
         logging.info("Stored %s of %s for %s in '%s'" % (elements.keys(), group_name, model_wrapper.model_name, path))
+        return elements

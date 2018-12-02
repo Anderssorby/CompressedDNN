@@ -8,9 +8,7 @@ import os
 
 VERSION = 0.1
 
-results_dir = os.path.join(os.getcwd(), "results")
-
-model_save_dir = os.path.join(results_dir, "saved_models")
+results_dir = os.getenv("ODIN_RESULTS_DIR", os.path.join(os.getcwd(), "results"))
 
 model_wrapper = None  # For convenience when testing
 
