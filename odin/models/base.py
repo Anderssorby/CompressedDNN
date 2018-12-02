@@ -42,10 +42,16 @@ class ModelWrapper(object):
         self.dataset = self.load_dataset()
         if len(self.dataset) == 4:
             self.x_train, self.y_train, self.x_test, self.y_test = self.dataset
-        self.model = self.load(new_model=kwargs.get("new_model", False))
+        new_model = kwargs.get("new_model", False)
+        if new_model:
+            self.model = self.construct()
+            print("Constructed model %s" % self)
+        else:
+            self.model = self.load()
+            print("Loaded model %s" % self)
+
         self._elements = {}
         self._layers = []
-        print("Loaded model %s" % self)
 
     def put_group(self, group, elements):
         """
@@ -54,7 +60,10 @@ class ModelWrapper(object):
         :param elements:
         :return:
         """
-        self._elements[group] = elements
+        if group not in self._elements.keys():
+            self._elements[group] = elements
+        else:
+            self._elements[group].update(elements)
         return co.store_elements(group_name=group, model_wrapper=self, elements=elements)
 
     def get_group(self, group):
@@ -75,7 +84,7 @@ class ModelWrapper(object):
         return self._elements[group][element_name]
 
     @abstractmethod
-    def load(self, new_model=False):
+    def load(self):
         raise NotImplemented
 
     @abstractmethod
@@ -94,7 +103,7 @@ class ModelWrapper(object):
         return os.path.join(self.model_path, self._saved_model_name)
 
     @abstractmethod
-    def construct(self, **kwargs):
+    def construct(self):
         raise NotImplemented
 
     @abstractmethod

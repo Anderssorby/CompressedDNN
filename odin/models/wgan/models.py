@@ -75,7 +75,7 @@ class WGANWrapper(ChainerModelWrapper):
     def __init__(self, **kwargs):
         super(WGANWrapper, self).__init__(**kwargs)
 
-    def construct(self, **kwargs):
+    def construct(self):
         self.generator = Generator()
         self.critic = Critic()
 

@@ -6,7 +6,7 @@ from keras.models import Sequential
 
 class MNISTCNNWrapper(KerasModelWrapper):
 
-    def construct(self, **kwargs):
+    def construct(self):
         input_shape = (None,)
         num_category = 10
         model = Sequential()

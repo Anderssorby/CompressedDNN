@@ -25,12 +25,11 @@ class ChainerModelWrapper(ModelWrapper):
     model_type = "chainer"
     dataset_name = "mnist"
 
-    def load(self, new_model=False):
+    def load(self):
         model = self.construct(**self.args)
 
-        if not new_model:
-            path = os.path.join(self.model_path, self._saved_model_name)
-            chainer.serializers.load_hdf5(path, model)
+        path = os.path.join(self.model_path, self._saved_model_name)
+        chainer.serializers.load_hdf5(path, model)
 
         return model
 

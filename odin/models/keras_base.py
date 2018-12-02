@@ -42,11 +42,8 @@ class KerasModelWrapper(ModelWrapper):
 
         return self._layers
 
-    def load(self, new_model=False):
-        if new_model:
-            return self.construct()
-        else:
-            return keras.models.load_model(self.saved_model_path)
+    def load(self):
+        return keras.models.load_model(self.saved_model_path)
 
     def save(self):
         if not os.path.isdir(self.model_path):
@@ -82,6 +79,7 @@ class KerasModelWrapper(ModelWrapper):
         scores = self.model.test_on_batch(x_test, y_test)
         print('Test loss:', scores[0])
         print('Test accuracy:', scores[1])
+        return scores
 
     def load_dataset(self):
         return load_dataset(self.dataset_name, options=self.args)

@@ -112,8 +112,8 @@ class MNISTWrapper(ChainerModelWrapper):
         _, test = self.dataset
         return test
 
-    def construct(self, **kwargs):
+    def construct(self):
         unit = self.args.get("unit")
-        l1, l2 = kwargs.get("layer_widths", (unit, unit))
+        l1, l2 = self.args.get("layer_widths", (unit, unit))
         model = L.Classifier(MLP(l1, l2, 10))
         return model

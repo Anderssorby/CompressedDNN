@@ -36,7 +36,7 @@ def test_lambda_optimizer(**kwargs):
     print(w_result)
 
 
-def update_architecture(**kwargs):
+def calc_index_set(**kwargs):
     """
     [WIP]
     Calculate the new architecture given already computed layer widths.
@@ -66,10 +66,26 @@ def update_architecture(**kwargs):
     logging.info("Finding the new architecture for %s" % layer_widths)
     print("Finding the new architecture for %s" % layer_widths)
 
-    new_model = architecture.transfer_to_architecture(model_wrapper=model_wrapper, layer_widths=layer_widths,
-                                                      cov_list=cov_list)
+    architecture.calculate_index_set(model_wrapper=model_wrapper, layer_widths=layer_widths,
+                                     cov_list=cov_list)
 
-    new_model.save()
+
+def create_compressed_network(**kwargs):
+    """
+    Dependecy: calc_index_set
+    :param kwargs:
+    :return:
+    """
+    model_wrapper = load_model(kwargs.get("model"), **kwargs)
+
+    r_dof = model_wrapper.get_group("range_test")
+    layer_widths_list = r_dof["all_layer_widths"]
+
+    data = model_wrapper.get_group("inter_layer_covariance")
+    cov_list = data["cov"]
+    model = architecture.transfer_to_architecture(model_wrapper=model_wrapper,
+                                                  cov_list=cov_list)
+    model.save()
 
 
 def measure_goodness(**kwargs):
@@ -81,34 +97,25 @@ def measure_goodness(**kwargs):
     :param kwargs:
     :return:
     """
-    model_wrapper = load_model(kwargs.get("model"), **kwargs)
+    original_model = load_model(kwargs.get("model"), **kwargs)
+    kwargs['prefix'] = kwargs['prefix'] + "_compressed"
+    compressed_model = load_model(kwargs.get("model"), **kwargs)
 
-    method = "Newton-CG"
-    r_dof = model_wrapper.get_group("range_dof_%s" % method)
-    bounds = r_dof["bounds"]
-    layer_widths_list = r_dof["layer_widths"]
-    lambdas = r_dof["lambdas"]
+    loss_original = original_model.test()
 
-    datastore = model_wrapper.get_group("inter_layer_covariance")
-    cov_list = datastore["cov"]
-    eigen_values = datastore["eigen_values"]
+    loss_compressed = compressed_model.test()
 
-    loss_before = []
-    loss_after = []
-
-    layer_widths = layer_widths_list[1]
-
-    new_model = architecture.transfer_to_architecture(model_wrapper=model_wrapper, layer_widths=layer_widths,
-                                                      cov_list=cov_list)
-
-    before = new_model.test()
-    loss_before.append(before)
+    print(loss_original, loss_compressed)
 
     # Fine tune
-    new_model.train()
+    print("Fine tuning")
+    compressed_model.train()
 
-    after = new_model.test()
-    loss_after.append(after)
+    loss_compressed_fine_tuned = compressed_model.test()
+    print(loss_compressed_fine_tuned)
+
+    compressed_model.prefix += "_fine_tuned"
+    compressed_model.save()
 
 
 def calc_dof(**kwargs):
@@ -314,7 +321,10 @@ action_map = {
     "calc_eigs": calc_eigs,
     "train_model": train_model,
     "measure_goodness": measure_goodness,
-    "update_architecture": update_architecture,
-    "up_arch": update_architecture,
+    "update_architecture": calc_index_set,
+    "up_arch": calc_index_set,
+    "calc_index_set": calc_index_set,
+    "create_compressed_network": create_compressed_network,
+    "compress": create_compressed_network,
     "": test_lambda_optimizer
 }
