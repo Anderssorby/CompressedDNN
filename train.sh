@@ -13,7 +13,7 @@
 # qrsh -jc gpu-container_g1_dev -ac d=aip-gpinfo-03
 
 export PROJECT=CompressedDNN
-if [ ! -d ${PROJECT} ]; then
+if [[ ! -d ${PROJECT} ]]; then
  echo "Can't find $PROJECT."
  echo $HOME
 else

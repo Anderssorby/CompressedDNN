@@ -5,6 +5,7 @@ from chainer import Variable
 
 
 class WassersteinGANUpdater(training.StandardUpdater):
+
     def __init__(self, iterator, noise_iterator, optimizer_generator,
                  optimizer_critic, device=-1):
 
@@ -89,7 +90,7 @@ class WassersteinGANUpdater(training.StandardUpdater):
             z = self.next_batch(self.z)
             x_fake = self.generator(z)
             y_fake = self.critic(x_fake)
-            y_fake.grad = -1 * self.xp.ones_like(y_fake.data)
+            y_fake.grad = -1 * self.xp.ones(y_fake.size, dtype=np.float32)
             _update(self.optimizer_critic, y_fake)
 
             reporter.report({

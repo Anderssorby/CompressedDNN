@@ -66,26 +66,20 @@ class Critic(chainer.Chain):
         return h
 
 
-class WGANWrapper(ChainerModelWrapper):
+class WGANChainerWrapper(ChainerModelWrapper):
     critic: Critic
     generator: Generator
 
     model_name = "cifar10_wgan"
 
     def __init__(self, **kwargs):
-        super(WGANWrapper, self).__init__(**kwargs)
+        super(WGANChainerWrapper, self).__init__(**kwargs)
 
     def construct(self):
         self.generator = Generator()
         self.critic = Critic()
 
-    def train(self, x_train=None, y_train=None, **options):
-        kwargs = vars(options.get("args"))
-
-        nz = kwargs.get('nz', 100)
-        batch_size = kwargs.get('batch_size', 64)
-        epochs = kwargs.get('epochs', 10000)
-        gpu = kwargs.get('gpu', -1)
+    def train(self, nz=100, batch_size=64, epochs=10000, gpu=-1, **kwargs):
 
         # CIFAR-10 images in range [-1, 1] (tanh generator outputs)
         train, _ = datasets.get_cifar10(withlabel=False, ndim=3, scale=2)

@@ -21,7 +21,7 @@ def check_or_create_dir(d):
     return d
 
 
-def default_save_path(name, category=""):
+def default_save_path(name, category="", experiment=None):
     if not model_wrapper:
         model_name = "other"
         args = [results_dir, model_name]
@@ -34,6 +34,9 @@ def default_save_path(name, category=""):
 
     if category:
         args.append(category)
+
+    if experiment:
+        args.append(experiment)
 
     check_or_create_dir(os.path.join(*args))
 

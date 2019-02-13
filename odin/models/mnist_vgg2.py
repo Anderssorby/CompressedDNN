@@ -108,10 +108,6 @@ class MNISTWrapper(ChainerModelWrapper):
         # Run the training
         trainer.run()
 
-    def test(self):
-        _, test = self.dataset
-        return test
-
     def construct(self):
         unit = self.args.get("unit")
         l1, l2 = self.args.get("layer_widths", (unit, unit))

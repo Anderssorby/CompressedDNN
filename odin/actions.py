@@ -135,7 +135,7 @@ def calc_dof(**kwargs):
     method = "Newton-CG"
     line = co.xp.linspace(5.0, 100.0, num=100)
     lambdas, layer_widths, success = l_opt.range_lambda_dof(line, method=method)
-    co.store_elements(model_wrapper=model_wrapper,
+    co.store_elements(model_wrapper=model_wrapper, experiment=kwargs.get("experiment"),
                       elements={"lambdas": lambdas, "bounds": line, "layer_widths": layer_widths, "success": success},
                       group_name="range_dof_%s" % method)
 
@@ -166,6 +166,7 @@ def plot_dof(**kwargs):
 def range_test(**kwargs):
     """
     Test LambdaOptimizer over a range
+    Dependency: calc_eigs
 
     :param kwargs:
     :return:
@@ -185,7 +186,8 @@ def range_test(**kwargs):
     all_layer_widths = []
     bar = ChargingBar("Testing a range of rho on LambdaOptimizer", max=num)
     for rho in rho_range:
-        lambdas, layer_widths = l_opt.optimize(rho=rho, method=method, debug=False, regularizing=regularizing)
+        lambdas, layer_widths = l_opt.optimize(rho=rho, method=method, debug=kwargs.get('verbose'),
+                                               regularizing=regularizing)
         if kwargs['verbose']:
             print("rho=", rho, layer_widths, lambdas)
         all_lambdas.append(lambdas)
@@ -193,9 +195,11 @@ def range_test(**kwargs):
         bar.next()
     bar.finish()
 
-    return co.store_elements(model_wrapper=model_wrapper, group_name="range_test",
-                             elements={"rho_range": rho_range, "all_lambdas": all_lambdas,
-                                       "all_layer_widths": all_layer_widths})
+    co.store_elements(model_wrapper=model_wrapper, group_name="range_test", experiment=kwargs.get("experiment"),
+                      elements={"rho_range": rho_range, "all_lambdas": all_lambdas,
+                                "all_layer_widths": all_layer_widths})
+    if kwargs.get('plot'):
+        range_test_plot(**kwargs)
 
 
 def range_test_plot(**kwargs):
@@ -207,7 +211,7 @@ def range_test_plot(**kwargs):
     :return:
     """
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
-    data = model_wrapper.get_group("range_test")
+    data = model_wrapper.get_group("range_test", experiment=kwargs.get("experiment"))
     rho_range = data["rho_range"]
     all_lambdas = data["all_lambdas"]
     all_layer_widths = data["all_layer_widths"]
@@ -224,7 +228,7 @@ def range_test_plot(**kwargs):
     oplt.plot(rho_range, all_layer_widths)
     oplt.labels(r"$\rho$", "$\hat{m}_{\ell}$")
     oplt.legend([r"$\hat{m}_{%d}$" % l for l in range(n_layers)])
-    oplt.save("range_test")
+    oplt.save("range_test", experiment=kwargs.get("experiment"))
     oplt.show()
 
     return fig
@@ -264,9 +268,11 @@ def train_model(**kwargs):
     :param kwargs:
     :return:
     """
+    # Remove None values
+    kwargs = {a: b for a, b in kwargs.items() if b is not None}
     kwargs['new_model'] = True
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
-
+    
     model_wrapper.train(**kwargs)
     model_wrapper.save()
 
@@ -288,8 +294,11 @@ def test_model(**kwargs):
     :return:
     """
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
+    scores = model_wrapper.test()
+    print('Test loss:', scores[0])
+    print('Test accuracy:', scores[1])
 
-    return model_wrapper.test(**kwargs)
+    return scores
 
 
 class ActionManager:
@@ -320,6 +329,7 @@ action_map = {
     "calc_dof": calc_dof,
     "calc_eigs": calc_eigs,
     "train_model": train_model,
+    "test_model": test_model,
     "measure_goodness": measure_goodness,
     "update_architecture": calc_index_set,
     "up_arch": calc_index_set,

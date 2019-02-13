@@ -63,8 +63,8 @@ def labels(x_label, y_label):
     plt.ylabel(y_label)
 
 
-def save(name="figure"):
-    path = odin.default_save_path(name, category="plots")
+def save(name="figure", experiment=None):
+    path = odin.default_save_path(name, category="plots", experiment=experiment)
     plt.savefig(path + ".pdf", format="pdf")
 
 

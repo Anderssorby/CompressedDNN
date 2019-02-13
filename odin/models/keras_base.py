@@ -77,8 +77,6 @@ class KerasModelWrapper(ModelWrapper):
         (_, _), (x_test, y_test) = self.load_dataset()
 
         scores = self.model.test_on_batch(x_test, y_test)
-        print('Test loss:', scores[0])
-        print('Test accuracy:', scores[1])
         return scores
 
     def load_dataset(self):

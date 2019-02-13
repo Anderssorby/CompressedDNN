@@ -15,7 +15,7 @@ class MiniModel(KerasModelWrapper):
         if layer_widths is None or len(layer_widths) != 3:
             layer_widths = [16, 12, 10]
 
-        model = Sequential(name="Mini")
+        model = Sequential(name="MiniModel")
         model.add(Dense(layer_widths[0], input_dim=30, activation='relu', use_bias=use_bias, name="hidden1"))
         model.add(Dense(layer_widths[1], activation='relu', use_bias=use_bias, name="hidden2"))
         model.add(Dense(layer_widths[2], activation='relu', use_bias=use_bias, name="hidden3"))

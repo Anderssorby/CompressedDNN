@@ -7,7 +7,7 @@ import os
 
 class TensorflowWrapper(ComputationInterface):
 
-    def load_elements(self, group_name, model_wrapper):
+    def load_elements(self, group_name, model_wrapper, experiment=None):
         save_path = os.path.join(model_wrapper.model_path, group_name, "saved.ckpt")
         if not os.path.isdir(save_path):
             os.makedirs(save_path)
@@ -18,7 +18,7 @@ class TensorflowWrapper(ComputationInterface):
 
             saver.restore(session, save_path)
 
-    def store_elements(self, elements, group_name, model_wrapper, use_saver=False):
+    def store_elements(self, elements, group_name, model_wrapper, use_saver=False, experiment=None):
         if not use_saver:
             super(TensorflowWrapper, self).store_elements(elements=elements, group_name=group_name,
                                                           model_wrapper=model_wrapper)

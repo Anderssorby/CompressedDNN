@@ -53,29 +53,52 @@ class ModelWrapper(object):
         self._elements = {}
         self._layers = []
 
-    def put_group(self, group, elements):
+    def put_group(self, group, elements, experiment=None):
         """
         Save a group of data associated with this model.
+        :param experiment:
         :param group:
         :param elements:
         :return:
         """
         if group not in self._elements.keys():
-            self._elements[group] = elements
+            if experiment:
+                if experiment not in self._elements[group].keys():
+                    self._elements[group] = {}
+                else:
+                    self._elements[group][experiment].update(elements)
+                self._elements[group][experiment] = elements
+            else:
+                self._elements[group] = elements
         else:
-            self._elements[group].update(elements)
-        return co.store_elements(group_name=group, model_wrapper=self, elements=elements)
+            if experiment:
+                if type(self._elements[group]) != dict:
+                    a = {"default": self._elements[group]}
+                    self._elements[group] = a
+                elif experiment not in self._elements[group].keys():
+                    self._elements[group][experiment] = elements
+                else:
+                    self._elements[group][experiment].update(elements)
+            else:
+                self._elements[group].update(elements)
+        return co.store_elements(group_name=group, model_wrapper=self, elements=elements, experiment=experiment)
 
-    def get_group(self, group):
+    def get_group(self, group, experiment=None):
         """
         Load a group of data associated with this model.
+        :param experiment:
         :param group:
         :return: the elements in the group.
         """
 
         if group not in self._elements.keys():
-            data_store = co.load_elements(group_name=group, model_wrapper=self)
-            self._elements[group] = data_store
+            data_store = co.load_elements(group_name=group, model_wrapper=self, experiment=experiment)
+            if experiment:
+                if experiment not in self._elements[group].keys():
+                    self._elements[group] = {}
+                self._elements[group][experiment] = data_store
+            else:
+                self._elements[group] = data_store
 
         return self._elements[group]
 
@@ -133,11 +156,11 @@ class ModelWrapper(object):
 
 available_models = {
     "keras_xor": "odin.models.keras_xor.KerasXOR",
-    "cifar10_wgan": "odin.models.mnist_vgg2.MNISTWrapper",
     "mnist_vgg2": "odin.models.mnist_vgg2.MNISTWrapper",
     "cifar10_cnn": "odin.models.cifar10_cnn.Cifar10CNN",
     "rnn_lm": "odin.models.rnn_lm.RNNForLMWrapper",
     "mini_model": "odin.models.mini_model.MiniModel",
+    "cifar10_wgan": "odin.models.wgan.chainer_models.WGANChainerWrapper",
 }
 
 

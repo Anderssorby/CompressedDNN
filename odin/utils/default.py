@@ -36,10 +36,12 @@ def default_arguments_and_behavior():
                     default=False, help="load or start from scratch")
 
     ap.add_argument("-p", '--prefix', type=str, default='default',
-                    help="An additional label for your model")
+                    help="An additional sublabel for your model")
+    ap.add_argument("-e", '--experiment', type=str, required=False, dest="experiment",
+                    help="An additional experiment label for your model")
 
-    ap.add_argument("-a", "--action", dest="action", required=False,
-                    default="", choices=odin.actions.action_map.keys(), help="action keyword")
+    ap.add_argument("-a", "--action", dest="action", required=True, nargs="?",
+                    choices=odin.actions.action_map.keys(), help="action keyword")
 
     ap.add_argument("-f", "--file-prefix", required=False,
                     default="save", help="prefix for the files of computed values")
@@ -64,9 +66,9 @@ def default_arguments_and_behavior():
                     help='Count; action specific.')
 
     # Plot and print
-    ap.add_argument("--plot", type=bool, dest="plot", default=True,
+    ap.add_argument("--plot", dest="plot", action="store_true",
                     help="Plot the results.")
-    ap.add_argument("-v", "--verbose", type=bool, dest="verbose", default=False,
+    ap.add_argument("-v", "--verbose", dest="verbose", action="store_true",
                     help="Print detailed information. May slow down execution.")
 
     # optimization
@@ -87,6 +89,7 @@ def default_arguments_and_behavior():
     ap.add_argument('--bproplen', '-l', type=int, default=35,
                     help='Number of words in each mini-batch '
                          '(= length of truncated BPTT)')
+
     ap.add_argument('--regularizing', type=str, default="sq", choices=["sq", "abs"],
                     help="Which regularizer to use in lambda optimizer")
 

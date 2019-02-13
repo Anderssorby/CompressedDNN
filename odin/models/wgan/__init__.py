@@ -1,2 +1,2 @@
-from .models import WGANWrapper
+from .chainer_models import WGANChainerWrapper
 
