@@ -56,3 +56,6 @@ class ChainerModelWrapper(ModelWrapper):
     def get_layer_outputs(self, x):
         return self.model.predictor(x, multi_layer=True)
 
+    def summary(self):
+        return self.model.summary()
+

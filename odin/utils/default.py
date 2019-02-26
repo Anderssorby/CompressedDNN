@@ -30,13 +30,12 @@ def default_arguments_and_behavior():
     print("----SETUP----")
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("-m", "--model", required=False,
-                    default="mnist_vgg2", help="model to compress")
+    ap.add_argument("-m", "--model", required=True, help="model to do action on")
     ap.add_argument("--new-model", "--new_model", required=False, type=bool,
                     default=False, help="load or start from scratch")
 
     ap.add_argument("-p", '--prefix', type=str, default='default',
-                    help="An additional sublabel for your model")
+                    help="An additional sub label for your model")
     ap.add_argument("-e", '--experiment', type=str, required=False, dest="experiment",
                     help="An additional experiment label for your model")
 

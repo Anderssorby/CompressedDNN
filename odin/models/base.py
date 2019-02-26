@@ -46,6 +46,7 @@ class ModelWrapper(object):
         if new_model:
             self.model = self.construct()
             print("Constructed model %s" % self)
+            self.summary()
         else:
             self.model = self.load()
             print("Loaded model %s" % self)
@@ -149,6 +150,10 @@ class ModelWrapper(object):
     def weights(self):
         raise NotImplemented
 
+    @abstractmethod
+    def summary(self):
+        raise NotImplemented
+
     def __str__(self):
         return "%s(%s):%s {dataset: %s} at '%s'" % (
             self.model_name, self.__class__.__name__, self.prefix, self.dataset_name, self.model_path)
@@ -160,7 +165,7 @@ available_models = {
     "cifar10_cnn": "odin.models.cifar10_cnn.Cifar10CNN",
     "rnn_lm": "odin.models.rnn_lm.RNNForLMWrapper",
     "mini_model": "odin.models.mini_model.MiniModel",
-    "cifar10_wgan": "odin.models.wgan.chainer_models.WGANChainerWrapper",
+    "cifar10_wgan": "odin.models.wgan.keras_models.WGANKerasWrapper",
 }
 
 

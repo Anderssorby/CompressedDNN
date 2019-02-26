@@ -128,9 +128,9 @@ class Dataset:
         return train_data, train_labels, test_data, test_labels
 
 
-class Cifar_10(Dataset):
+class Cifar10(Dataset):
     source = "http://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
-    name = "cifar-10"
+    name = "cifar10"
 
     def _extract_train(self):
 
@@ -239,7 +239,7 @@ class Mini(Dataset):
 
 
 datasets = {
-    "cifar-10": Cifar_10,
+    "cifar10": Cifar10,
     "mnist": MNIST,
     "ptb_words": PTBWords,
     "mini": Mini
