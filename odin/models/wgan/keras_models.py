@@ -1,5 +1,5 @@
 from keras.models import Sequential, Model
-from keras.layers import Deconv2D, BatchNormalization, Conv2D, Input, Reshape
+from keras.layers import Deconv2D, BatchNormalization, Conv2D, Input, Reshape, Dense, UpSampling2D
 from keras.datasets import cifar10
 from keras.optimizers import RMSprop
 import keras.backend as K
@@ -20,16 +20,30 @@ class Generator(Model):
     def __init__(self, latent_dim):
         """
 
-        :param latent_dim: Needs to be a three tensor
+        :param latent_dim: A suitable shape for the noise
         """
         model = Sequential(name=self.name)
-        model.add(Deconv2D(filters=256, kernel_size=4, strides=1, input_shape=latent_dim, padding="same"))
-        model.add(BatchNormalization())
-        model.add(Deconv2D(filters=128, kernel_size=4, strides=2, padding="same"))
-        model.add(BatchNormalization())
-        model.add(Deconv2D(filters=64, kernel_size=4, strides=2, padding="same"))
-        model.add(BatchNormalization())
-        model.add(Deconv2D(filters=3, kernel_size=4, strides=2, activation="tanh", padding="same"))
+        channels = 3
+
+        base_dim = 8  # 32 // 4
+
+        model.add(Dense(128 * base_dim * base_dim, activation="relu", input_dim=latent_dim[0]))
+        model.add(Reshape((base_dim, base_dim, 128)))
+        model.add(UpSampling2D())
+        model.add(Conv2D(128, kernel_size=4, padding="same", activation="relu"))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(UpSampling2D())
+        model.add(Conv2D(64, kernel_size=4, padding="same", activation="relu"))
+        model.add(BatchNormalization(momentum=0.8))
+        model.add(Conv2D(channels, kernel_size=4, padding="same", activation="tanh"))
+
+        # model.add(Deconv2D(filters=256, kernel_size=4, strides=1, input_shape=latent_dim, padding="same"))
+        # model.add(BatchNormalization())
+        # model.add(Deconv2D(filters=128, kernel_size=4, strides=2, padding="same"))
+        # model.add(BatchNormalization())
+        # model.add(Deconv2D(filters=64, kernel_size=4, strides=2, padding="same"))
+        # model.add(BatchNormalization())
+        # model.add(Deconv2D(filters=3, kernel_size=4, strides=2, activation="tanh", padding="same"))
 
         noise = Input(shape=latent_dim, name="generator_input")
         img = model(noise)
@@ -67,7 +81,7 @@ class WGANKerasWrapper(KerasModelWrapper):
     model_name = "cifar10_wgan"
     dataset_name = "cifar10"
 
-    def __init__(self, latent_dim=20, clip_value=0.01, n_critic=5, initial_learning_rate=0.005, **kwargs):
+    def __init__(self, latent_dim=100, clip_value=0.01, n_critic=5, initial_learning_rate=0.005, **kwargs):
         """
         Some hyper parameters
         :param latent_dim: The dimensionality of the noise (latent_dim // 2, latent_dim // 2, 3)
@@ -75,7 +89,7 @@ class WGANKerasWrapper(KerasModelWrapper):
         :param initial_learning_rate:
         :param kwargs:
         """
-        self.latent_dim = (latent_dim // 2, latent_dim // 2, 3)
+        self.latent_dim = (latent_dim,)  # (latent_dim // 2, latent_dim // 2, 3)
         self.clip_value = clip_value
         self.n_critic = n_critic
         self.img_rows = 32
@@ -189,7 +203,7 @@ class WGANKerasWrapper(KerasModelWrapper):
                 axs[i, j].imshow(gen_imgs[cnt, :, :, 0])
                 axs[i, j].axis('off')
                 cnt += 1
-        oplt.save("sample_images/cifar10_%d.png" % epoch)
+        oplt.save(category="sample_images", name="cifar10_%d" % epoch, figure=fig)
         oplt.close()
 
     def load_dataset(self):
