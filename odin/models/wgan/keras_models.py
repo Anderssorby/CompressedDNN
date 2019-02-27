@@ -132,7 +132,7 @@ class WGANKerasWrapper(KerasModelWrapper):
     def wasserstein_loss(y_true, y_pred):
         return K.mean(y_true * y_pred)
 
-    def train(self, epochs=1000, sample_interval=50, batch_size=100, **options):
+    def train(self, epochs=1000, sample_interval=50, batch_size=1000, **options):
         # Load the dataset
         (x_train, _), (_, _) = self.load_dataset()
         self.show(format="png")
@@ -200,7 +200,7 @@ class WGANKerasWrapper(KerasModelWrapper):
         cnt = 0
         for i in range(r):
             for j in range(c):
-                axs[i, j].imshow(gen_imgs[cnt, :, :, 0])
+                axs[i, j].imshow(gen_imgs[cnt, :, :, :])
                 axs[i, j].axis('off')
                 cnt += 1
         oplt.save(category="sample_images", name="cifar10_%d" % epoch, figure=fig)

@@ -270,7 +270,7 @@ def train_model(**kwargs):
     """
     # Remove None values
     kwargs = {a: b for a, b in kwargs.items() if b is not None}
-    kwargs['new_model'] = True
+    # kwargs['new_model'] = True
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
     
     model_wrapper.train(**kwargs)
