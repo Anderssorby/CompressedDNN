@@ -1,6 +1,7 @@
 from keras.models import Sequential, Model
-from keras.layers import Deconv2D, BatchNormalization, Conv2D, Input, Reshape, Dense, UpSampling2D
-from keras.datasets import cifar10
+from keras.layers import Deconv2D, BatchNormalization, Conv2D, Input, Reshape, Dense, UpSampling2D, \
+    Dropout, ZeroPadding2D, LeakyReLU, Flatten
+from keras.datasets import mnist
 from keras.optimizers import RMSprop
 import keras.backend as K
 import numpy as np
@@ -17,33 +18,35 @@ class Generator(Model):
 
     name = "WGAN-Generator"
 
-    def __init__(self, latent_dim):
+    def __init__(self, latent_dim, img_shape: (int, int, int), arch=1):
         """
 
         :param latent_dim: A suitable shape for the noise
         """
         model = Sequential(name=self.name)
-        channels = 3
 
-        base_dim = 8  # 32 // 4
+        rows = img_shape[0]
+        channels = img_shape[2]
+        base_dim = rows // 4
 
-        model.add(Dense(128 * base_dim * base_dim, activation="relu", input_dim=latent_dim[0]))
-        model.add(Reshape((base_dim, base_dim, 128)))
-        model.add(UpSampling2D())
-        model.add(Conv2D(128, kernel_size=4, padding="same", activation="relu"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(UpSampling2D())
-        model.add(Conv2D(64, kernel_size=4, padding="same", activation="relu"))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Conv2D(channels, kernel_size=4, padding="same", activation="tanh"))
-
-        # model.add(Deconv2D(filters=256, kernel_size=4, strides=1, input_shape=latent_dim, padding="same"))
-        # model.add(BatchNormalization())
-        # model.add(Deconv2D(filters=128, kernel_size=4, strides=2, padding="same"))
-        # model.add(BatchNormalization())
-        # model.add(Deconv2D(filters=64, kernel_size=4, strides=2, padding="same"))
-        # model.add(BatchNormalization())
-        # model.add(Deconv2D(filters=3, kernel_size=4, strides=2, activation="tanh", padding="same"))
+        if arch == 1:
+            model.add(Dense(128 * base_dim * base_dim, activation="relu", input_dim=latent_dim[0]))
+            model.add(Reshape((base_dim, base_dim, 128)))
+            model.add(UpSampling2D())
+            model.add(Conv2D(128, kernel_size=4, padding="same", activation="relu"))
+            model.add(BatchNormalization(momentum=0.8))
+            model.add(UpSampling2D())
+            model.add(Conv2D(64, kernel_size=4, padding="same", activation="relu"))
+            model.add(BatchNormalization(momentum=0.8))
+            model.add(Conv2D(channels, kernel_size=4, padding="same", activation="tanh"))
+        else:
+            model.add(Deconv2D(filters=256, kernel_size=4, strides=1, input_shape=latent_dim, padding="same"))
+            model.add(BatchNormalization())
+            model.add(Deconv2D(filters=128, kernel_size=4, strides=2, padding="same"))
+            model.add(BatchNormalization())
+            model.add(Deconv2D(filters=64, kernel_size=4, strides=2, padding="same"))
+            model.add(BatchNormalization())
+            model.add(Deconv2D(filters=channels, kernel_size=4, strides=2, activation="tanh", padding="same"))
 
         noise = Input(shape=latent_dim, name="generator_input")
         img = model(noise)
@@ -59,14 +62,35 @@ class Discriminator(Model):
 
     name = "WGAN-Discriminator"
 
-    def __init__(self, img_shape):
+    def __init__(self, img_shape, arch=1):
         model = Sequential(name=self.name)
-        model.add(Conv2D(filters=64, kernel_size=4, strides=2))
-        model.add(BatchNormalization())
-        model.add(Conv2D(filters=128, kernel_size=4, strides=2))
-        model.add(BatchNormalization())
-        model.add(Conv2D(filters=256, kernel_size=4, strides=2))
-        model.add(Conv2D(filters=1, kernel_size=2, strides=1))
+
+        if arch == 1:
+            model.add(Conv2D(16, kernel_size=3, strides=2, input_shape=img_shape, padding="same"))
+            model.add(LeakyReLU(alpha=0.2))
+            model.add(Dropout(0.25))
+            model.add(Conv2D(32, kernel_size=3, strides=2, padding="same"))
+            model.add(ZeroPadding2D(padding=((0, 1), (0, 1))))
+            model.add(BatchNormalization(momentum=0.8))
+            model.add(LeakyReLU(alpha=0.2))
+            model.add(Dropout(0.25))
+            model.add(Conv2D(64, kernel_size=3, strides=2, padding="same"))
+            model.add(BatchNormalization(momentum=0.8))
+            model.add(LeakyReLU(alpha=0.2))
+            model.add(Dropout(0.25))
+            model.add(Conv2D(128, kernel_size=3, strides=1, padding="same"))
+            model.add(BatchNormalization(momentum=0.8))
+            model.add(LeakyReLU(alpha=0.2))
+            model.add(Dropout(0.25))
+            model.add(Flatten())
+            model.add(Dense(1))
+        else:
+            model.add(Conv2D(filters=64, kernel_size=4, strides=2))
+            model.add(BatchNormalization())
+            model.add(Conv2D(filters=128, kernel_size=4, strides=2))
+            model.add(BatchNormalization())
+            model.add(Conv2D(filters=256, kernel_size=4, strides=2))
+            model.add(Conv2D(filters=1, kernel_size=2, strides=1))
 
         img = Input(shape=img_shape, name="discriminator_input")
         validity = model(img)
@@ -75,11 +99,17 @@ class Discriminator(Model):
 
 
 class WGANKerasWrapper(KerasModelWrapper):
+    """
+    A GAN using the wasserstein metric as loss
+    """
+
     discriminator: Discriminator
     generator: Generator
 
-    model_name = "cifar10_wgan"
-    dataset_name = "cifar10"
+    img_rows: int
+    img_cols: int
+    channels: int = 3
+    img_shape: (int, int, int)
 
     def __init__(self, latent_dim=100, clip_value=0.01, n_critic=5, initial_learning_rate=0.005, **kwargs):
         """
@@ -92,17 +122,13 @@ class WGANKerasWrapper(KerasModelWrapper):
         self.latent_dim = (latent_dim,)  # (latent_dim // 2, latent_dim // 2, 3)
         self.clip_value = clip_value
         self.n_critic = n_critic
-        self.img_rows = 32
-        self.img_cols = 32
-        self.channels = 3
-        self.img_shape = (self.img_rows, self.img_cols, self.channels)
         self.learning_rate = initial_learning_rate
         self.combined = None  # alias of model
 
         super(WGANKerasWrapper, self).__init__(**kwargs)
 
     def construct(self):
-        self.generator = Generator(self.latent_dim)
+        self.generator = Generator(self.latent_dim, img_shape=self.img_shape)
         self.discriminator = Discriminator(self.img_shape)
 
         optimizer = RMSprop(lr=self.learning_rate)
@@ -140,13 +166,19 @@ class WGANKerasWrapper(KerasModelWrapper):
 
         # Rescale -1 to 1: [0, 255] -> [-1, 1]
         x_train = (x_train.astype(np.float32) - 127.5) / 127.5
-        # x_train = np.expand_dims(x_train, axis=3)
+
+        # convention to add extra dimension
+        if self.channels == 1:
+            x_train = np.expand_dims(x_train, axis=3)
 
         # Adversarial ground truths
         valid = -np.ones((batch_size, 1))
         fake = np.ones((batch_size, 1))
 
         for epoch in range(epochs):
+
+            noise = None
+            d_loss = None
 
             for _ in range(n_critic):
 
@@ -206,5 +238,33 @@ class WGANKerasWrapper(KerasModelWrapper):
         oplt.save(category="sample_images", name="cifar10_%d" % epoch, figure=fig)
         oplt.close()
 
+
+class MnistWGAN(WGANKerasWrapper):
+
+    model_name = "mnist_wgan"
+    dataset_name = "mnist"
+
+    img_rows = 28
+    img_cols = 28
+    channels = 1
+    img_shape = (img_rows, img_cols, channels)
+
+    def __init__(self, **kwargs):
+        super(MnistWGAN, self).__init__(**kwargs)
+
     def load_dataset(self):
-        return cifar10.load_data()
+        return mnist.load_data()
+
+
+class Cifar10WGAN(WGANKerasWrapper):
+
+    model_name = "cifar10_wgan"
+    dataset_name = "cifar10"
+
+    img_rows = 32
+    img_cols = 32
+    channels = 3
+    img_shape = (img_rows, img_cols, channels)
+
+    def __init__(self, **kwargs):
+        super(Cifar10WGAN, self).__init__(**kwargs)

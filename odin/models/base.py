@@ -165,7 +165,8 @@ available_models = {
     "cifar10_cnn": "odin.models.cifar10_cnn.Cifar10CNN",
     "rnn_lm": "odin.models.rnn_lm.RNNForLMWrapper",
     "mini_model": "odin.models.mini_model.MiniModel",
-    "cifar10_wgan": "odin.models.wgan.keras_models.WGANKerasWrapper",
+    "cifar10_wgan": "odin.models.wgan.keras_models.Cifar10WGAN",
+    "mnist_wgan": "odin.models.wgan.keras_models.MnistWGAN",
 }
 
 

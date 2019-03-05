@@ -32,7 +32,7 @@ def default_arguments_and_behavior():
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", required=True, help="model to do action on")
     ap.add_argument("--new-model", "--new_model", required=False, type=bool,
-                    default=False, help="load or start from scratch")
+                    help="load or start from scratch")
 
     ap.add_argument("-p", '--prefix', type=str, default='default',
                     help="An additional sub label for your model")
@@ -45,7 +45,7 @@ def default_arguments_and_behavior():
     ap.add_argument("-f", "--file-prefix", required=False,
                     default="save", help="prefix for the files of computed values")
     ap.add_argument('--gpu', type=int, default=-1)
-    ap.add_argument('--epochs', type=int, default=200)
+    ap.add_argument('--epochs', type=int, required=False)
     ap.add_argument('--batch_size', type=int, required=False)
     ap.add_argument('--snapshot', type=int, default=10)
     ap.add_argument('-n', "--no-large-files", type=bool, default=False,
@@ -75,9 +75,9 @@ def default_arguments_and_behavior():
                     choices=['MomentumSGD', 'Adam', 'AdaGrad'])
     ap.add_argument('--weight_decay', type=float, default=0.0001)
     ap.add_argument('--alpha', type=float, default=0.001)
-    ap.add_argument('--lr', type=float, default=0.01)
-    ap.add_argument('--lr_decay_freq', type=int, default=5)
-    ap.add_argument('--lr_decay_ratio', type=float, default=0.1)
+    ap.add_argument('--lr', type=float, required=False)
+    ap.add_argument('--lr_decay_freq', type=int, required=False)
+    ap.add_argument('--lr_decay_ratio', type=float, required=False)
     ap.add_argument('--validate_freq', type=int, default=1)
     ap.add_argument('--seed', type=int, default=1701)
     ap.add_argument('--frequency', type=int, default=-1)

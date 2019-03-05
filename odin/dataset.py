@@ -183,6 +183,10 @@ class Cifar10(Dataset):
 
         return data, labels
 
+    def load(self):
+        from keras.datasets import cifar10
+        return cifar10.load_data()
+
 
 class MNIST(Dataset):
     def _extract_test(self):
