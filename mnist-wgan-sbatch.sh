@@ -11,6 +11,9 @@
 #
 # For interactive environment
 # qrsh -jc gpu-container_g1_dev -ac d=aip-gpinfo-03
+# -- SBATCH -- options
+#SBATCH --gres=gpu:4
+#SBATCH --time=12:00:00
 
 export PROJECT=CompressedDNN
 if [[ ! -d ${PROJECT} ]]; then
@@ -29,5 +32,6 @@ MODEL=cifar10_wgan
 EPOCH=10000
 ACTION=train_model
 GPU=0
+CONFIG=mnist-wgan.yaml
 
-python do.py --action ${ACTION} --model ${MODEL} --gpu ${GPU} --epoch ${EPOCH}
+python do.py --config ${CONFIG} --gpu ${GPU}

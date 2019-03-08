@@ -1,0 +1,7 @@
+# Train a WGAN on Cifar10
+action: train_model
+model: cifar10_wgan
+lr: 0.00005
+epochs: 10000
+plot: true
+prefix: default

@@ -184,6 +184,8 @@ class MNIST(Dataset):
     image_dim = 28 * 28
     image_shape = (28, 28, 1)
 
+    dataset: (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+
     def __init__(self):
         super(MNIST, self).__init__()
 
@@ -195,6 +197,7 @@ class MNIST(Dataset):
         f = np.load(path)
         self.train = self.x_train, self.y_train = f['x_train'], f['y_train']
         self.test = self.x_test, self.y_test = f['x_test'], f['y_test']
+        self.dataset = self.x_train, self.y_train, self.x_test, self.y_test
         f.close()
 
         # make sure that each type of digits have exactly 10 samples
@@ -203,15 +206,16 @@ class MNIST(Dataset):
         rnd_state = np.random.get_state()
         np.random.seed(0)
         for cat in range(10):
-            ids = np.where(self.train.labels == cat)[0]
+            ids = np.where(self.train[1] == cat)[0]
             np.random.shuffle(ids)
-            sup_images.extend(self.train.images[ids[:10]])
-            sup_labels.extend(self.train.labels[ids[:10]])
+            sup_images.extend(self.train[0][ids[:10]])
+            sup_labels.extend(self.train[1][ids[:10]])
         np.random.set_state(rnd_state)
         self.supervised_train = (
             np.asarray(sup_images),
             np.asarray(sup_labels),
         )
+
         self.validation = self.test
 
     def _extract_test(self):
@@ -235,7 +239,7 @@ class MNIST(Dataset):
         return 4
 
     def __getitem__(self, item):
-        return self._dataset[item]
+        return self.dataset[item]
 
     def load(self, is_chainer=False):
 
