@@ -1,0 +1,5 @@
+action: train_model
+model: info_gan
+lr: 0.00005
+epochs: 10000
+plot: true

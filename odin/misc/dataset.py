@@ -1,26 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
 import argparse
 import glob
 import logging
-import os
 import sys
-from abc import abstractmethod
 from subprocess import check_call
 
-import numpy as np
 from scipy import linalg
 from six.moves import cPickle as pickle
 from skimage.io import imsave
 
-from odin.utils.transformer import Transformer
 from odin.utils.generate import *
+from odin.utils.transformer import Transformer
 
 data_dir = "data"
 
@@ -189,13 +180,45 @@ class Cifar10(Dataset):
 
 
 class MNIST(Dataset):
+    name = "mnist"
+    image_dim = 28 * 28
+    image_shape = (28, 28, 1)
+
+    def __init__(self):
+        super(MNIST, self).__init__()
+
+        from keras.utils.data_utils import get_file
+        path = 'mnist.npz'
+        path = get_file(path,
+                        origin='https://s3.amazonaws.com/img-datasets/mnist.npz',
+                        file_hash='8a61469f7ea1b51cbae51d4f78837e45')
+        f = np.load(path)
+        self.train = self.x_train, self.y_train = f['x_train'], f['y_train']
+        self.test = self.x_test, self.y_test = f['x_test'], f['y_test']
+        f.close()
+
+        # make sure that each type of digits have exactly 10 samples
+        sup_images = []
+        sup_labels = []
+        rnd_state = np.random.get_state()
+        np.random.seed(0)
+        for cat in range(10):
+            ids = np.where(self.train.labels == cat)[0]
+            np.random.shuffle(ids)
+            sup_images.extend(self.train.images[ids[:10]])
+            sup_labels.extend(self.train.labels[ids[:10]])
+        np.random.set_state(rnd_state)
+        self.supervised_train = (
+            np.asarray(sup_images),
+            np.asarray(sup_labels),
+        )
+        self.validation = self.test
+
     def _extract_test(self):
         unpickle("train-images-idx3-ubyte.gz")
 
     def _extract_train(self):
         pass
-
-    name = "mnist"
 
     def _download(self):
         sources = [
@@ -205,17 +228,26 @@ class MNIST(Dataset):
             "http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz"
         ]
         for i, source in enumerate(sources):
-            print("Downloading %d of 4" % (i+1))
+            print("Downloading %d of 4" % (i + 1))
             download_and_unwrap_tarball(source)
 
-    def load(self):
-        import chainer
-        train, test = chainer.datasets.get_mnist()
-        return train, test
+    def __len__(self):
+        return 4
+
+    def __getitem__(self, item):
+        return self._dataset[item]
+
+    def load(self, is_chainer=False):
+
+        if is_chainer:
+            import chainer
+            train, test = chainer.datasets.get_mnist()
+            return train, test
+        else:
+            return self.train, self.test
 
 
 class PTBWords(Dataset):
-
     name = "ptb_words"
 
     def load(self):

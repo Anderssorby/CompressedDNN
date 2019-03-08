@@ -1,7 +1,7 @@
 from keras.models import Sequential
 from keras.layers.core import Dense
 from odin.models.keras_base import KerasModelWrapper
-from odin.dataset import load_dataset
+from odin.misc.dataset import load_dataset
 
 
 class MiniModel(KerasModelWrapper):

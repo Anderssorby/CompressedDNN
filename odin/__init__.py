@@ -9,6 +9,7 @@ import os
 VERSION = 0.1
 
 results_dir = os.getenv("ODIN_RESULTS_DIR", os.path.join(os.getcwd(), "results"))
+log_dir = ""
 
 model_wrapper = None  # For convenience when testing
 

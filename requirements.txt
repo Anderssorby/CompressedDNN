@@ -5,6 +5,9 @@ scikit-image
 progress
 pydot
 
+# config loader
+pyyaml
+
 # Homology computation
 phat
 

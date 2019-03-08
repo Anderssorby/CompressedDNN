@@ -1,9 +1,8 @@
-import glob
 import os
 
 import chainer.serializers
 
-from odin.dataset import load_dataset
+from odin.misc.dataset import load_dataset
 from odin.models.base import LayerWrapper, ModelWrapper
 
 

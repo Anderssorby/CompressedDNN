@@ -1,3 +1,4 @@
+import keras
 from keras.models import Sequential, Model
 from keras.layers import Deconv2D, BatchNormalization, Conv2D, Input, Reshape, Dense, UpSampling2D, \
     Dropout, ZeroPadding2D, LeakyReLU, Flatten
@@ -20,7 +21,6 @@ class Generator(Model):
 
     def __init__(self, latent_dim, img_shape: (int, int, int), arch=1):
         """
-
         :param latent_dim: A suitable shape for the noise
         """
         model = Sequential(name=self.name)
@@ -111,7 +111,7 @@ class WGANKerasWrapper(KerasModelWrapper):
     channels: int = 3
     img_shape: (int, int, int)
 
-    def __init__(self, latent_dim=100, clip_value=0.01, n_critic=5, initial_learning_rate=0.005, **kwargs):
+    def __init__(self, latent_dim=100, clip_value=0.01, n_critic=5, initial_learning_rate=0.00005, **kwargs):
         """
         Some hyper parameters
         :param latent_dim: The dimensionality of the noise (latent_dim // 2, latent_dim // 2, 3)
@@ -124,6 +124,7 @@ class WGANKerasWrapper(KerasModelWrapper):
         self.n_critic = n_critic
         self.learning_rate = initial_learning_rate
         self.combined = None  # alias of model
+        self.optimizer = RMSprop(lr=self.learning_rate)
 
         super(WGANKerasWrapper, self).__init__(**kwargs)
 
@@ -131,10 +132,8 @@ class WGANKerasWrapper(KerasModelWrapper):
         self.generator = Generator(self.latent_dim, img_shape=self.img_shape)
         self.discriminator = Discriminator(self.img_shape)
 
-        optimizer = RMSprop(lr=self.learning_rate)
-
         self.discriminator.compile(loss=self.wasserstein_loss,
-                                   optimizer=optimizer,
+                                   optimizer=self.optimizer,
                                    metrics=['accuracy'])
         # The generator takes noise as input and generated imgs
         z = Input(shape=self.latent_dim, name="combined_input")
@@ -149,7 +148,7 @@ class WGANKerasWrapper(KerasModelWrapper):
         # The combined model  (stacked generator and discriminator)
         self.combined = Model(z, valid)
         self.combined.compile(loss=self.wasserstein_loss,
-                              optimizer=optimizer,
+                              optimizer=self.optimizer,
                               metrics=['accuracy'])
 
         return self.combined
@@ -158,11 +157,12 @@ class WGANKerasWrapper(KerasModelWrapper):
     def wasserstein_loss(y_true, y_pred):
         return K.mean(y_true * y_pred)
 
-    def train(self, epochs=1000, sample_interval=50, batch_size=1000, **options):
+    def train(self, epochs=1000, sample_interval=50, batch_size=1000, n_critic=1, **options):
         # Load the dataset
         (x_train, _), (_, _) = self.load_dataset()
-        self.show(format="png")
-        n_critic = 1
+
+        # tb_callback = keras.callbacks.TensorBoard(log_dir='./log/Graph', histogram_freq=0,
+        #                                          write_graph=True, write_images=True)
 
         # Rescale -1 to 1: [0, 255] -> [-1, 1]
         x_train = (x_train.astype(np.float32) - 127.5) / 127.5
@@ -232,15 +232,17 @@ class WGANKerasWrapper(KerasModelWrapper):
         cnt = 0
         for i in range(r):
             for j in range(c):
-                axs[i, j].imshow(gen_imgs[cnt, :, :, :])
+                if self.channels == 1:
+                    axs[i, j].imshow(gen_imgs[cnt, :, :, 0], cmap="gray")
+                else:
+                    axs[i, j].imshow(gen_imgs[cnt, :, :, :])
                 axs[i, j].axis('off')
                 cnt += 1
-        oplt.save(category="sample_images", name="cifar10_%d" % epoch, figure=fig)
+        oplt.save(category="sample_images", name=self.dataset_name + "_%d" % epoch, figure=fig)
         oplt.close()
 
 
 class MnistWGAN(WGANKerasWrapper):
-
     model_name = "mnist_wgan"
     dataset_name = "mnist"
 
@@ -257,7 +259,6 @@ class MnistWGAN(WGANKerasWrapper):
 
 
 class Cifar10WGAN(WGANKerasWrapper):
-
     model_name = "cifar10_wgan"
     dataset_name = "cifar10"
 

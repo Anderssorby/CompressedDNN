@@ -1,6 +1,6 @@
 import os
 
-from odin.dataset import load_dataset
+from odin.misc.dataset import load_dataset
 from odin.models.base import ModelWrapper, LayerWrapper
 import keras.models
 from keras import backend
