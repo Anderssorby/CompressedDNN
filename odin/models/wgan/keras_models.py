@@ -164,6 +164,27 @@ class WGANKerasWrapper(KerasModelWrapper):
         # tb_callback = keras.callbacks.TensorBoard(log_dir='./log/Graph', histogram_freq=0,
         #                                          write_graph=True, write_images=True)
 
+        model_checkpoint = keras.callbacks.ModelCheckpoint(
+            self.model_path + "snapshot.{epoch:02d}-{g_loss:.2f}-{d_loss:.2f}.hdf5",
+            monitor='val_loss', verbose=0, save_best_only=False,
+            save_weights_only=False, mode='auto', period=100)
+
+        self.model.history = keras.callbacks.History()
+        _callbacks = [keras.callbacks.BaseLogger(
+            stateful_metrics=self.model.stateful_metric_names),
+            model_checkpoint
+        ]
+
+        callback_list = keras.callbacks.CallbackList(_callbacks)
+        callback_list.set_model(self.combined)
+        callback_list.set_params({
+            'batch_size': batch_size,
+            'epochs': epochs,
+            'verbose': 1,
+            # 'do_validation': do_validation,
+            'metrics': ["d_loss", "g_loss"],
+        })
+
         # Rescale -1 to 1: [0, 255] -> [-1, 1]
         x_train = (x_train.astype(np.float32) - 127.5) / 127.5
 
@@ -175,7 +196,10 @@ class WGANKerasWrapper(KerasModelWrapper):
         valid = -np.ones((batch_size, 1))
         fake = np.ones((batch_size, 1))
 
+        callback_list.on_train_begin()
+
         for epoch in range(epochs):
+            callback_list.on_epoch_begin(epoch)
 
             noise = None
             d_loss = None
@@ -216,9 +240,13 @@ class WGANKerasWrapper(KerasModelWrapper):
             # Plot the progress
             print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
 
+            callback_list.on_epoch_end(epoch, logs={"g_loss": 1 - g_loss[0], "d_loss": 1 - d_loss[0]})
+
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.sample_images(epoch)
+
+        callback_list.on_train_end()
 
     def sample_images(self, epoch):
         r, c = 5, 5
