@@ -2,8 +2,13 @@ scipy
 matplotlib
 numpy
 scikit-image
-progress
+
 pydot
+
+# Progress monitoring
+tqdm
+progress
+parmap
 
 # config loader
 pyyaml
@@ -18,3 +23,6 @@ tensorflow
 
 # Julia
 julia
+
+# Data
+opencv-python

@@ -2,6 +2,7 @@ import prettytensor as pt
 import tensorflow as tf
 from prettytensor.pretty_tensor_class import Phase
 import numpy as np
+import keras.layers
 
 
 class conv_batch_norm(pt.VarStoreMethod):
@@ -71,6 +72,21 @@ class custom_conv2d(pt.VarStoreMethod):
             biases = self.variable('biases', [output_dim], init=tf.constant_initializer(0.0))
             # import ipdb; ipdb.set_trace()
             return input_layer.with_tensor(tf.nn.bias_add(conv, biases), parameters=self.vars)
+
+class CustomConv2D(keras.layers.Conv2D):
+
+    def __init__(self, input_layer, output_dim,
+                 k_h=5, k_w=5, d_h=2, d_w=2, stddev=0.02, in_dim=None, padding='SAME',
+                 name="conv2d"):
+        with tf.variable_scope(name):
+            w = self.variable('w', [k_h, k_w, in_dim or input_layer.shape[-1], output_dim],
+                              init=tf.truncated_normal_initializer(stddev=stddev))
+            conv = tf.nn.conv2d(input_layer.tensor, w, strides=[1, d_h, d_w, 1], padding=padding)
+
+            biases = self.variable('biases', [output_dim], init=tf.constant_initializer(0.0))
+            # import ipdb; ipdb.set_trace()
+            return input_layer.with_tensor(tf.nn.bias_add(conv, biases), parameters=self.vars)
+
 
 
 @pt.Register

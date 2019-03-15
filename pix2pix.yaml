@@ -1,0 +1,10 @@
+action: train_model
+model: pix2pix
+#lr: 0.00005
+epochs: 100000
+plot: true
+batch_size: 100
+generator_architecture: deconv
+prefix: test1
+label_flipping: false
+sample_interval: 100

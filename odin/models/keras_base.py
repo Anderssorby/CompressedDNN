@@ -1,7 +1,8 @@
 import os
+from abc import ABC
 
 from odin.misc.dataset import load_dataset
-from odin.models.base import ModelWrapper, LayerWrapper
+from odin.models.base import ModelWrapper, LayerWrapper, CallbackManager
 import keras.models
 from keras import backend
 from keras.utils import plot_model
@@ -25,9 +26,73 @@ class KerasLayer(LayerWrapper):
         self.original = layer
 
 
-class KerasModelWrapper(ModelWrapper):
+class KerasCallbackManager(CallbackManager, ABC):
+
+    def __init__(self, callbacks):
+        self.callback_list = keras.callbacks.CallbackList(callbacks)
+        super(KerasCallbackManager, self).__init__(callbacks)
+
+    def set_model(self, model):
+        super(KerasCallbackManager, self).set_model(model)
+        self.callback_list.set_model(model)
+
+    def set_params(self, params: dict):
+        super(KerasCallbackManager, self).set_params(params)
+        self.callback_list.set_params(params)
+
+    def add_callbacks(self, callbacks):
+        super(KerasCallbackManager, self).add_callbacks(callbacks)
+        for callback in callbacks:
+            self.callback_list.append(callback)
+
+    def on_train_begin(self, logs=None):
+        self.callback_list.on_train_begin(logs=logs)
+
+    def on_train_end(self, logs=None):
+        self.callback_list.on_train_end(logs=logs)
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self.callback_list.on_epoch_begin(epoch, logs)
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.callback_list.on_epoch_end(epoch, logs)
+
+    def on_batch_begin(self, batch, logs=None):
+        self.callback_list.on_batch_begin(batch, logs)
+
+    def on_batch_end(self, batch, logs=None):
+        self.callback_list.on_batch_end(batch, logs)
+
+
+class KerasModelWrapper(ModelWrapper, ABC):
     model_type = "keras"
     history = None
+    callback_manager_class = KerasCallbackManager
+
+    def __init__(self, callbacks: list = None, save_checkpoint=True, checkpoint_interval=100,
+                 stateful_metric_names=None,
+                 checkpoint_name="snapshot.{epoch:02d}.hdf5", **kwargs):
+
+        self.history = keras.callbacks.History()
+
+        if not callbacks:
+            callbacks = []
+        assert isinstance(callbacks, list)
+
+        callbacks += [keras.callbacks.BaseLogger(
+            stateful_metrics=stateful_metric_names),
+            self.history
+        ]
+
+        self._layers = None
+        super(KerasModelWrapper, self).__init__(callbacks=callbacks, **kwargs)
+
+        if save_checkpoint:
+            model_checkpoint = keras.callbacks.ModelCheckpoint(
+                os.path.join(self.model_path, checkpoint_name),
+                monitor='val_loss', verbose=0, save_best_only=False,
+                save_weights_only=False, mode='auto', period=checkpoint_interval)
+            self.callback_manager.add_callbacks([model_checkpoint])
 
     def weights(self):
         return self.model.get_weights()

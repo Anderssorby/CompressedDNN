@@ -19,7 +19,7 @@ class Generator(Model):
 
     name = "WGAN-Generator"
 
-    def __init__(self, latent_dim, img_shape: (int, int, int), arch=1):
+    def __init__(self, latent_dim, img_shape: (int, int, int), architecture="up_sampling"):
         """
         :param latent_dim: A suitable shape for the noise
         """
@@ -29,7 +29,7 @@ class Generator(Model):
         channels = img_shape[2]
         base_dim = rows // 4
 
-        if arch == 1:
+        if architecture == "up_sampling":
             model.add(Dense(128 * base_dim * base_dim, activation="relu", input_dim=latent_dim[0]))
             model.add(Reshape((base_dim, base_dim, 128)))
             model.add(UpSampling2D())
@@ -39,7 +39,9 @@ class Generator(Model):
             model.add(Conv2D(64, kernel_size=4, padding="same", activation="relu"))
             model.add(BatchNormalization(momentum=0.8))
             model.add(Conv2D(channels, kernel_size=4, padding="same", activation="tanh"))
-        else:
+        elif architecture == "deconv":
+            model.add(Dense(256 * base_dim * base_dim, activation="relu", input_dim=latent_dim[0]))
+            model.add(Reshape((base_dim, base_dim, 256)))
             model.add(Deconv2D(filters=256, kernel_size=4, strides=1, input_shape=latent_dim, padding="same"))
             model.add(BatchNormalization())
             model.add(Deconv2D(filters=128, kernel_size=4, strides=2, padding="same"))
@@ -47,6 +49,8 @@ class Generator(Model):
             model.add(Deconv2D(filters=64, kernel_size=4, strides=2, padding="same"))
             model.add(BatchNormalization())
             model.add(Deconv2D(filters=channels, kernel_size=4, strides=2, activation="tanh", padding="same"))
+        else:
+            raise ValueError(architecture)
 
         noise = Input(shape=latent_dim, name="generator_input")
         img = model(noise)
@@ -62,10 +66,10 @@ class Discriminator(Model):
 
     name = "WGAN-Discriminator"
 
-    def __init__(self, img_shape, arch=1):
+    def __init__(self, img_shape, architecture="up_sampling"):
         model = Sequential(name=self.name)
 
-        if arch == 1:
+        if architecture == "up_sampling":
             model.add(Conv2D(16, kernel_size=3, strides=2, input_shape=img_shape, padding="same"))
             model.add(LeakyReLU(alpha=0.2))
             model.add(Dropout(0.25))
@@ -84,13 +88,20 @@ class Discriminator(Model):
             model.add(Dropout(0.25))
             model.add(Flatten())
             model.add(Dense(1))
+        elif architecture == "deconv":
+            model.add(Conv2D(filters=64, kernel_size=4, strides=2, input_shape=img_shape, padding="same"))
+            model.add(LeakyReLU(alpha=0.2))
+            model.add(BatchNormalization())
+            model.add(Conv2D(filters=128, kernel_size=4, strides=2, padding="same"))
+            model.add(LeakyReLU(alpha=0.2))
+            model.add(BatchNormalization())
+            model.add(Conv2D(filters=256, kernel_size=4, strides=2, padding="same"))
+            model.add(LeakyReLU(alpha=0.2))
+            model.add(Conv2D(filters=1, kernel_size=2, strides=1, padding="same"))
+            model.add(Flatten())
+            model.add(Dense(1))
         else:
-            model.add(Conv2D(filters=64, kernel_size=4, strides=2))
-            model.add(BatchNormalization())
-            model.add(Conv2D(filters=128, kernel_size=4, strides=2))
-            model.add(BatchNormalization())
-            model.add(Conv2D(filters=256, kernel_size=4, strides=2))
-            model.add(Conv2D(filters=1, kernel_size=2, strides=1))
+            raise ValueError(architecture)
 
         img = Input(shape=img_shape, name="discriminator_input")
         validity = model(img)
@@ -110,8 +121,10 @@ class WGANKerasWrapper(KerasModelWrapper):
     img_cols: int
     channels: int = 3
     img_shape: (int, int, int)
+    architecture: str
 
-    def __init__(self, latent_dim=100, clip_value=0.01, n_critic=5, initial_learning_rate=0.00005, **kwargs):
+    def __init__(self, latent_dim=100, clip_value=0.01, n_critic=5, initial_learning_rate=0.00005,
+                 architecture="up_sampling", **kwargs):
         """
         Some hyper parameters
         :param latent_dim: The dimensionality of the noise (latent_dim // 2, latent_dim // 2, 3)
@@ -125,12 +138,14 @@ class WGANKerasWrapper(KerasModelWrapper):
         self.learning_rate = initial_learning_rate
         self.combined = None  # alias of model
         self.optimizer = RMSprop(lr=self.learning_rate)
+        self.architecture = architecture
 
-        super(WGANKerasWrapper, self).__init__(**kwargs)
+        super(WGANKerasWrapper, self).__init__(checkpoint_name="snapshot.{epoch:02d}-{g_loss:.2f}-{d_loss:.2f}.hdf5",
+                                               **kwargs)
 
     def construct(self):
-        self.generator = Generator(self.latent_dim, img_shape=self.img_shape)
-        self.discriminator = Discriminator(self.img_shape)
+        self.generator = Generator(self.latent_dim, img_shape=self.img_shape, architecture=self.architecture)
+        self.discriminator = Discriminator(self.img_shape, architecture=self.architecture)
 
         self.discriminator.compile(loss=self.wasserstein_loss,
                                    optimizer=self.optimizer,
@@ -164,24 +179,11 @@ class WGANKerasWrapper(KerasModelWrapper):
         # tb_callback = keras.callbacks.TensorBoard(log_dir='./log/Graph', histogram_freq=0,
         #                                          write_graph=True, write_images=True)
 
-        model_checkpoint = keras.callbacks.ModelCheckpoint(
-            self.model_path + "snapshot.{epoch:02d}-{g_loss:.2f}-{d_loss:.2f}.hdf5",
-            monitor='val_loss', verbose=0, save_best_only=False,
-            save_weights_only=False, mode='auto', period=100)
-
-        self.model.history = keras.callbacks.History()
-        _callbacks = [keras.callbacks.BaseLogger(
-            stateful_metrics=self.model.stateful_metric_names),
-            model_checkpoint
-        ]
-
-        callback_list = keras.callbacks.CallbackList(_callbacks)
-        callback_list.set_model(self.combined)
-        callback_list.set_params({
+        self.callback_manager.set_params({
             'batch_size': batch_size,
             'epochs': epochs,
             'verbose': 1,
-            # 'do_validation': do_validation,
+            'do_validation': False,
             'metrics': ["d_loss", "g_loss"],
         })
 
@@ -196,10 +198,10 @@ class WGANKerasWrapper(KerasModelWrapper):
         valid = -np.ones((batch_size, 1))
         fake = np.ones((batch_size, 1))
 
-        callback_list.on_train_begin()
+        self.callback_manager.on_train_begin()
 
         for epoch in range(epochs):
-            callback_list.on_epoch_begin(epoch)
+            self.callback_manager.on_epoch_begin(epoch)
 
             noise = None
             d_loss = None
@@ -240,13 +242,13 @@ class WGANKerasWrapper(KerasModelWrapper):
             # Plot the progress
             print("%d [D loss: %f] [G loss: %f]" % (epoch, 1 - d_loss[0], 1 - g_loss[0]))
 
-            callback_list.on_epoch_end(epoch, logs={"g_loss": 1 - g_loss[0], "d_loss": 1 - d_loss[0]})
+            self.callback_manager.on_epoch_end(epoch, logs={"g_loss": 1 - g_loss[0], "d_loss": 1 - d_loss[0]})
 
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.sample_images(epoch)
 
-        callback_list.on_train_end()
+        self.callback_manager.on_train_end()
 
     def sample_images(self, epoch):
         r, c = 5, 5

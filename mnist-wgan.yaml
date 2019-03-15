@@ -1,7 +1,9 @@
 action: train_model
 model: mnist_wgan
 lr: 0.00005
-epochs: 10000
+epochs: 100000
 plot: true
 # How often we sample images from the GAN
 sample_interval: 100
+prefix: test1
+architecture: deconv

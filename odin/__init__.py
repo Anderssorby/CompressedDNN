@@ -9,14 +9,19 @@ import os
 VERSION = 0.1
 
 results_dir = os.getenv("ODIN_RESULTS_DIR", os.path.join(os.getcwd(), "results"))
-log_dir = ""
+log_dir = os.path.join(os.getcwd(), "log")
+data_dir = os.path.join(os.getcwd(), "data")
 
 model_wrapper = None  # For convenience when testing
 
 config = {}
 
 
-def check_or_create_dir(d):
+def check_or_create_dir(*d):
+    if len(d) > 1:
+        d = os.path.join(*d)
+    else:
+        d = d[0]
     if not os.path.isdir(d):
         os.makedirs(d)
     return d
@@ -54,3 +59,4 @@ import odin.models
 import odin.actions
 import odin.compute
 import odin.utils
+

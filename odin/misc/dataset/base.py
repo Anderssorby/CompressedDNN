@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import argparse
 import glob
 import logging
 import sys
@@ -10,10 +9,9 @@ from scipy import linalg
 from six.moves import cPickle as pickle
 from skimage.io import imsave
 
+from odin import data_dir
 from odin.utils.generate import *
 from odin.utils.transformer import Transformer
-
-data_dir = "data"
 
 
 def unpickle(file):
@@ -27,13 +25,6 @@ def unpickle(file):
     return data
 
 
-def load_dataset(name, options={}):
-    # type: (str) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
-    dataset = datasets[name](**options)
-
-    return dataset.load()
-
-
 def preprocessing(data):
     mean = np.mean(data, axis=0)
     mdata = data - mean
@@ -45,18 +36,33 @@ def preprocessing(data):
     return components, mean, whiten
 
 
-def download_and_unwrap_tarball(source):
-    logging.info("Downloading from %s" % source)
-    check_call(["wget", source])
-    name = source.split("/")[-1]
-    check_call(["tar", "zxvf", name])
-    check_call(["rm", "-rf", name])
+def download_and_unwrap_tarball(source, name, force=False):
+    """
+
+    :param source: URL of interest
+    :param name:
+    :param force: Ignore the existence check
+    :return: path to the extracted dir
+    """
+    target_dir = os.path.join(data_dir, name)
+    if os.path.isdir(target_dir) and not force:
+        return target_dir
+    tar_file = os.path.join(data_dir, name+".tar.gz")
+    logging.info("Downloading from %s to %s" % (source, target_dir))
+    check_call(["mkdir", "-p", target_dir])
+    check_call(["wget", "-N", source, "-O", tar_file])
+    check_call(["tar", "-zxvf", tar_file, "-C", data_dir])
+    check_call(["rm", tar_file])
+    return target_dir
 
 
 class Dataset:
     """
     Superclass of data sets
     """
+    name: str
+    dataset: (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+    source: str
 
     def __init__(self,
                  whitening=False,
@@ -95,6 +101,12 @@ class Dataset:
 
         np.save(os.path.join(self.path, 'test_data'), data)
         np.save(os.path.join(self.path, 'test_labels'), labels)
+
+    def __len__(self):
+        return 4
+
+    def __getitem__(self, item):
+        return self.dataset[item]
 
     def load(self):
         if not os.path.isdir(self.path):
@@ -278,18 +290,3 @@ class Mini(Dataset):
         return train, test
 
 
-datasets = {
-    "cifar10": Cifar10,
-    "mnist": MNIST,
-    "ptb_words": PTBWords,
-    "mini": Mini
-}
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--name', type=str, default='cifar-10', choices=datasets.keys())
-    parser.add_argument('--whitening', action='store_true', default=False)
-    args = parser.parse_args()
-
-    load_dataset(name=args.name, whitening=args.whitening)
-    # print(args)

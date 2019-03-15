@@ -3,6 +3,9 @@ import prettytensor as pt
 import tensorflow as tf
 from odin.misc.custom_ops import leaky_rectify
 
+from keras.models import Sequential
+from keras.layers import Input
+
 
 class RegularizedGAN(object):
     def __init__(self, output_dist, latent_spec, batch_size, image_shape, network_type):
@@ -27,6 +30,9 @@ class RegularizedGAN(object):
 
         image_size = image_shape[0]
         if network_type == "mnist":
+            d_net = Sequential()
+            d_net.add(Conv2d)
+
             with tf.variable_scope("d_net"):
                 shared_template = \
                     (pt.template("input").

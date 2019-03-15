@@ -107,7 +107,9 @@ def default_arguments_and_behavior():
 
     kwargs = vars(args)
 
-    if args.config and os.path.isfile(args.config):
+    if args.config:
+        if not os.path.isfile(args.config):
+            raise ValueError(args.config + " is not a file.")
         stream = open(args.config, 'r')
         config = yaml.load(stream)
         kwargs.update(config)

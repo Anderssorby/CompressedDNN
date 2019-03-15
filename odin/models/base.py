@@ -7,6 +7,7 @@ from abc import abstractmethod
 import odin
 from odin.compute import default_interface as co
 from odin.utils import dynamic_class_import
+import abc
 
 
 class LayerWrapper(object):
@@ -27,6 +28,42 @@ class LayerWrapper(object):
         return self.__class__.__name__ + " for type=%s, (%s)" % (self.type, self.original)
 
 
+class CallbackManager(abc.ABC):
+    callbacks: list
+    model = None
+    params: dict = {}
+
+    def __init__(self, callbacks):
+        self.callbacks = callbacks
+
+    def set_model(self, model):
+        self.model = model
+
+    def set_params(self, params: dict):
+        self.params = params
+
+    def add_callbacks(self, callbacks: list):
+        self.callbacks += callbacks
+
+    def on_train_begin(self, logs=None):
+        raise NotImplemented
+
+    def on_train_end(self, logs=None):
+        raise NotImplemented
+
+    def on_epoch_begin(self, epoch, logs=None):
+        raise NotImplemented
+
+    def on_epoch_end(self, epoch, logs=None):
+        raise NotImplemented
+
+    def on_batch_begin(self, batch, logs=None):
+        raise NotImplemented
+
+    def on_batch_end(self, batch, logs=None):
+        raise NotImplemented
+
+
 class ModelWrapper(object):
     """
     Base class for all models. Supposed to be implementation and framework independent.
@@ -35,6 +72,8 @@ class ModelWrapper(object):
     model_name = "name_not_specified"
     dataset_name = "dataset_not_specified"
     _saved_model_name = "saved_model.h5"
+    callback_manager_class = CallbackManager
+    callback_manager: callback_manager_class
 
     def __init__(self, **kwargs):
         self.args = kwargs
@@ -53,6 +92,11 @@ class ModelWrapper(object):
 
         self._elements = {}
         self._layers = []
+
+        callbacks = kwargs.get("callbacks", [])
+
+        self.callback_manager = self.callback_manager_class(callbacks)
+        self.callback_manager.set_model(self.model)
 
     def put_group(self, group, elements, experiment=None):
         """
@@ -168,6 +212,7 @@ available_models = {
     "cifar10_wgan": "odin.models.wgan.keras_models.Cifar10WGAN",
     "mnist_wgan": "odin.models.wgan.keras_models.MnistWGAN",
     "info_gan": "odin.models.info_gan.trainer.InfoGAN",
+    "pix2pix": "odin.models.pix2pix.Pix2Pix",
 }
 
 
