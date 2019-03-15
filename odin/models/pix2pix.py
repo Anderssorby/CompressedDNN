@@ -9,7 +9,6 @@ from keras.layers.core import Flatten, Dense, Dropout, Activation, Lambda, Resha
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
-import progressbar
 
 from .keras_base import KerasModelWrapper
 import odin
