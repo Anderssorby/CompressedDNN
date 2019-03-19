@@ -202,11 +202,12 @@ def check_hdf5(jpeg_dir, nb_channels):
     # Get hdf5 file
     file_name = os.path.basename(jpeg_dir.rstrip("/"))
     hdf5_file = os.path.join(odin.data_dir, "%s_data.h5" % file_name)
+    max_plots = 20
 
     with h5py.File(hdf5_file, "r") as hf:
         data_full = hf["train_data_full"]
         data_sketch = hf["train_data_sketch"]
-        for i in range(data_full.shape[0]):
+        for i in range(min(data_full.shape[0], max_plots)):
             oplt.figure()
             img = data_full[i, :, :, :].transpose(1, 2, 0)
             img2 = data_sketch[i, :, :, :].transpose(1, 2, 0)
@@ -223,8 +224,9 @@ def check_hdf5(jpeg_dir, nb_channels):
 class MapImageData(Dataset):
     name = "satellite_images"
 
+    sample_shape = (256, 256, 3)
+
     def __init__(self):
-        self.dataset = self.load()
         super(MapImageData, self).__init__()
 
     def load(self):
@@ -238,29 +240,31 @@ class MapImageData(Dataset):
         with h5py.File(path, "r") as hf:
             print("File loaded")
 
-            X_full_train = hf["train_data_full"][:limit].astype(np.float32)
-            X_full_train = normalization(X_full_train)
+            x_full_train = hf["train_data_full"][:limit].astype(np.float32)
+            x_full_train = normalization(x_full_train)
 
-            X_sketch_train = hf["train_data_sketch"][:limit].astype(np.float32)
-            X_sketch_train = normalization(X_sketch_train)
-
-            if image_data_format == "channels_last":
-               X_full_train = X_full_train.transpose(0, 2, 3, 1)
-               X_sketch_train = X_sketch_train.transpose(0, 2, 3, 1)
-
-            X_full_val = hf["val_data_full"][:limit].astype(np.float32)
-            X_full_val = normalization(X_full_val)
-
-            X_sketch_val = hf["val_data_sketch"][:limit].astype(np.float32)
-            X_sketch_val = normalization(X_sketch_val)
+            x_sketch_train = hf["train_data_sketch"][:limit].astype(np.float32)
+            x_sketch_train = normalization(x_sketch_train)
 
             if image_data_format == "channels_last":
-               X_full_val = X_full_val.transpose(0, 2, 3, 1)
-               X_sketch_val = X_sketch_val.transpose(0, 2, 3, 1)
+                x_full_train = x_full_train.transpose(0, 2, 3, 1)
+                x_sketch_train = x_sketch_train.transpose(0, 2, 3, 1)
+
+            x_full_val = hf["val_data_full"][:limit].astype(np.float32)
+            x_full_val = normalization(x_full_val)
+
+            x_sketch_val = hf["val_data_sketch"][:limit].astype(np.float32)
+            x_sketch_val = normalization(x_sketch_val)
+
+            if image_data_format == "channels_last":
+                x_full_val = x_full_val.transpose(0, 2, 3, 1)
+                x_sketch_val = x_sketch_val.transpose(0, 2, 3, 1)
 
             print("Dataset loaded")
 
-            return X_full_train, X_sketch_train, X_full_val, X_sketch_val
+            self.dataset = x_full_train, x_sketch_train, x_full_val, x_sketch_val
+
+            return self.dataset
 
 
 def gen_batch(X1, X2, batch_size):
@@ -269,13 +273,13 @@ def gen_batch(X1, X2, batch_size):
         yield X1[idx], X2[idx]
 
 
-def get_disc_batch(X_full_batch, X_sketch_batch, generator_model, batch_counter, patch_size,
+def get_disc_batch(x_full_batch, x_sketch_batch, generator_model, batch_counter, patch_size,
                    image_data_format, label_smoothing=False, label_flipping=0):
-    # Create X_disc: alternatively only generated or real images
+    # Create x_disc: alternatively only generated or real images
     if batch_counter % 2 == 0:
         # Produce an output
-        X_disc = generator_model.predict(X_sketch_batch)
-        y_disc = np.zeros((X_disc.shape[0], 2), dtype=np.uint8)
+        x_disc = generator_model.predict(x_sketch_batch)
+        y_disc = np.zeros((x_disc.shape[0], 2), dtype=np.uint8)
         y_disc[:, 0] = 1
 
         if label_flipping > 0:
@@ -284,8 +288,8 @@ def get_disc_batch(X_full_batch, X_sketch_batch, generator_model, batch_counter,
                 y_disc[:, [0, 1]] = y_disc[:, [1, 0]]
 
     else:
-        X_disc = X_full_batch
-        y_disc = np.zeros((X_disc.shape[0], 2), dtype=np.uint8)
+        x_disc = x_full_batch
+        y_disc = np.zeros((x_disc.shape[0], 2), dtype=np.uint8)
         if label_smoothing:
             y_disc[:, 1] = np.random.uniform(low=0.9, high=1, size=y_disc.shape[0])
         else:
@@ -296,10 +300,10 @@ def get_disc_batch(X_full_batch, X_sketch_batch, generator_model, batch_counter,
             if p > 0:
                 y_disc[:, [0, 1]] = y_disc[:, [1, 0]]
 
-    # Now extract patches form X_disc
-    X_disc = extract_patches(X_disc, image_data_format, patch_size)
+    # Now extract patches form x_disc
+    x_disc = extract_patches(x_disc, image_data_format, patch_size)
 
-    return X_disc, y_disc
+    return x_disc, y_disc
 
 
 def plot_generated_batch(X_full, X_sketch, generator_model, batch_size, image_data_format, suffix, logging_dir):

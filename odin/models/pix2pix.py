@@ -1,7 +1,7 @@
 import keras.backend as K
 import numpy as np
 import time
-import keras
+import os
 from keras.layers import Input, Concatenate
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import Conv2D, Deconv2D, UpSampling2D
@@ -82,7 +82,7 @@ def up_conv_block_unet(x, x2, f, name, bn_mode, bn_axis, bn=True, dropout=False)
 def deconv_block_unet(x, x2, f, h, w, batch_size, name, bn_mode, bn_axis, bn=True, dropout=False):
     o_shape = (batch_size, h * 2, w * 2, f)
     x = Activation("relu")(x)
-    x = Deconv2D(f, (3, 3), output_shape=o_shape, strides=(2, 2), padding="same")(x)
+    x = Deconv2D(f, (3, 3), strides=(2, 2), padding="same")(x)
     if bn:
         x = BatchNormalization(axis=bn_axis)(x)
     if dropout:
@@ -190,7 +190,7 @@ class Generator(Model):
 
             x = Activation("relu")(list_decoder[-1])
             o_shape = (batch_size,) + img_dim
-            x = Deconv2D(nb_channels, (3, 3), output_shape=o_shape, strides=(2, 2), padding="same")(x)
+            x = Deconv2D(nb_channels, (3, 3), strides=(2, 2), padding="same")(x)
             x = Activation("tanh")(x)
         else:
             raise ValueError(architecture)
@@ -237,12 +237,10 @@ class DCGANDiscriminator(Model):
         x_flat = Flatten()(x)
         x = Dense(2, activation="softmax", name="disc_dense")(x_flat)
 
-        PatchGAN = Model(inputs=[x_input], outputs=[x, x_flat], name="PatchGAN")
-        print("PatchGAN summary")
-        PatchGAN.summary()
+        patch_gan = Model(inputs=[x_input], outputs=[x, x_flat], name="PatchGAN")
 
-        x = [PatchGAN(patch)[0] for patch in list_input]
-        x_mbd = [PatchGAN(patch)[1] for patch in list_input]
+        x = [patch_gan(patch)[0] for patch in list_input]
+        x_mbd = [patch_gan(patch)[1] for patch in list_input]
 
         if len(x) > 1:
             x = Concatenate(axis=bn_axis)(x)
@@ -269,6 +267,7 @@ class DCGANDiscriminator(Model):
         x_out = Dense(2, activation="softmax", name="disc_output")(x)
 
         super(DCGANDiscriminator, self).__init__(inputs=list_input, outputs=[x_out], name=model_name)
+        self.patch_gan = patch_gan
 
 
 class DCGAN(Model):
@@ -309,7 +308,18 @@ class Pix2Pix(KerasModelWrapper):
     dataset_name = "satellite_images"
 
     def __init__(self, batch_size=100, bn_mode=False, use_mbd=False, label_flipping=0.01, label_smoothing=True,
+                 dummy=False,
                  **kwargs):
+        """
+
+        :param batch_size:
+        :param bn_mode:
+        :param use_mbd:
+        :param label_flipping:
+        :param label_smoothing:
+        :param dummy: Use dummy data for faster debugging
+        :param kwargs:
+        """
         self.batch_size = batch_size
         self.generator_arch = kwargs["generator_architecture"]
         self.image_data_format = "channels_last"
@@ -322,6 +332,7 @@ class Pix2Pix(KerasModelWrapper):
         self.label_smoothing = label_smoothing
         self.label_flipping = label_flipping
         self.epochs = kwargs["epochs"]
+        self.dummy = dummy
 
         super(Pix2Pix, self).__init__(**kwargs)
 
@@ -349,6 +360,17 @@ class Pix2Pix(KerasModelWrapper):
                       self.patch_size,
                       self.image_data_format)
 
+        if self.verbose:
+            print("Discriminator summary")
+            self.discriminator.summary()
+
+            print("PatchGAN summary")
+
+            self.discriminator.patch_gan.summary()
+
+            print("Generator summary")
+            self.generator.summary()
+
         if self.do_plot:
             from keras.utils import plot_model
             for model in [self.discriminator, self.generator, model]:
@@ -366,7 +388,30 @@ class Pix2Pix(KerasModelWrapper):
         return model
 
     def load_dataset(self):
-        return data_utils.MapImageData()
+        dataset = data_utils.MapImageData()
+        if self.dummy:
+            dataset.load_dummy(self.batch_size * 2)
+        else:
+            dataset.load()
+        return dataset
+
+    def save(self, epoch=None, is_checkpoint=False, **kwargs):
+
+        if not epoch:
+            epoch = self.epochs
+
+        gen_weights_path = os.path.join(self.model_path,
+                                        "gen_weights_epoch:{epoch}-loss:{g_loss:.3f}.h5".format(epoch=epoch, **kwargs))
+        self.generator.save_weights(gen_weights_path, overwrite=True)
+
+        disc_weights_path = os.path.join(self.model_path,
+                                         'disc_weights_epoch:{epoch}-loss:{d_loss:.3f}.h5'.format(epoch=epoch,
+                                                                                                  **kwargs))
+        self.discriminator.save_weights(disc_weights_path, overwrite=True)
+
+        dcgan_weights_path = os.path.join(self.model_path,
+                                          'DCGAN_weights_epoch:{epoch}.h5'.format(epoch=epoch, **kwargs))
+        self.model.save_weights(dcgan_weights_path, overwrite=True)
 
     def train(self, **kwargs):
         """
@@ -374,123 +419,91 @@ class Pix2Pix(KerasModelWrapper):
 
         Load the whole train data in memory for faster operations
 
-        args: **kwargs (dict) keyword arguments that specify the model hyperparameters
+        args: **kwargs (dict) keyword arguments that specify the model hyper parameters
         """
 
-        # Roll out the parameters
-        # model_name = kwargs["model_name"]
-        # generator = kwargs["generator"]
-        # img_dim = kwargs["img_dim"]
-        # bn_mode = kwargs["bn_mode"]
-        # label_smoothing = kwargs["use_label_smoothing"]
-        # label_flipping = kwargs["label_flipping"]
-        # epochs = kwargs["epochs"]
-
         self.callback_manager.add_callbacks([
-            keras.callbacks.ProgbarLogger(count_mode='samples',
-                                          stateful_metrics=["d_loss", "g_loss", "g_l1_loss", "g_log_loss"])
+            odin.callbacks.ProgbarLogger(count_mode='samples',
+                                         stateful_metrics=["d_loss", "g_loss", "g_l1_loss", "g_log_loss"])
         ])
 
         # Load and rescale data
-        X_full_train, X_sketch_train, X_full_val, X_sketch_val = self.dataset
+        x_full_train, x_sketch_train, x_full_val, x_sketch_val = self.dataset
 
-        dataset_size = X_full_train.shape[0]
+        dataset_size = x_full_train.shape[0]
         steps_per_epoch = dataset_size // self.batch_size
         self.callback_manager.set_params({
             'batch_size': self.batch_size,
             'epochs': self.epochs,
-            'verbose': 1,
+            'verbose': 2 if self.verbose else 1,
             'samples': dataset_size,
             'steps': steps_per_epoch,
             'do_validation': False,
             'metrics': ["d_loss", "g_loss", "g_l1_loss", "g_log_loss"],
         })
-        # img_dim = X_full_train.shape[-3:]
+
+        self.n_batch_per_epoch = min(steps_per_epoch, self.n_batch_per_epoch)
+        self.callback_manager.set_model(self.model)
+        # img_dim = x_full_train.shape[-3:]
 
         self.callback_manager.on_train_begin()
         # Start training
         print("Start training")
         for epoch in range(self.epochs):
             self.callback_manager.on_epoch_begin(epoch)
-            # Initialize progbar and batch counter
-            batch_counter = 1
-            start = time.time()
             avg_gen_loss = 0
             avg_disc_loss = 0
-            # progbar = progressbar.ProgressBar(maxval=steps_per_epoch)
 
-            for batch, (X_full_batch, X_sketch_batch) in enumerate(
-                    data_utils.gen_batch(X_full_train, X_sketch_train, self.batch_size)):
+            for batch, (x_full_batch, x_sketch_batch) in enumerate(
+                    data_utils.gen_batch(x_full_train, x_sketch_train, self.batch_size), start=1):
                 self.callback_manager.on_batch_begin(batch)
                 # Create a batch to feed the discriminator model
-                X_disc, y_disc = data_utils.get_disc_batch(X_full_batch,
-                                                           X_sketch_batch,
+                x_disc, y_disc = data_utils.get_disc_batch(x_full_batch,
+                                                           x_sketch_batch,
                                                            self.generator,
-                                                           batch_counter,
+                                                           batch,
                                                            self.patch_size,
                                                            self.image_data_format,
                                                            label_smoothing=self.label_smoothing,
                                                            label_flipping=self.label_flipping)
 
                 # Update the discriminator
-                disc_loss = self.discriminator.train_on_batch(X_disc, y_disc)
+                disc_loss = self.discriminator.train_on_batch(x_disc, y_disc)
                 avg_disc_loss += disc_loss
 
                 # Create a batch to feed the generator model
-                X_gen_target, X_gen = next(data_utils.gen_batch(X_full_train, X_sketch_train, self.batch_size))
-                y_gen = np.zeros((X_gen.shape[0], 2), dtype=np.uint8)
+                x_gen_target, x_gen = next(data_utils.gen_batch(x_full_train, x_sketch_train, self.batch_size))
+                y_gen = np.zeros((x_gen.shape[0], 2), dtype=np.uint8)
                 y_gen[:, 1] = 1
 
                 # Freeze the discriminator
                 self.discriminator.trainable = False
-                gen_loss = self.model.train_on_batch(X_gen, [X_gen_target, y_gen])
+                gen_loss = self.model.train_on_batch(x_gen, [x_gen_target, y_gen])
                 avg_gen_loss += gen_loss[0]
                 # Unfreeze the discriminator
                 self.discriminator.trainable = True
 
-                batch_counter += 1
-                # progbar.update(batch)
-                # add(self.batch_size, values=[("D logloss", disc_loss),
-                #                              ("G tot", gen_loss[0]),
-                #                              ("G L1", gen_loss[1]),
-                #                              ("G logloss", gen_loss[2])])
-
                 # Save images for visualization
-                if batch_counter % (self.n_batch_per_epoch / 2) == 0:
+                if batch % (self.n_batch_per_epoch / 2) == 0:
                     # Get new images from validation
-                    data_utils.plot_generated_batch(X_full_batch, X_sketch_batch, self.generator,
+                    data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
                                                     self.batch_size, self.image_data_format, "training",
                                                     self.model_path)
-                    X_full_batch, X_sketch_batch = next(data_utils.gen_batch(X_full_val, X_sketch_val, self.batch_size))
-                    data_utils.plot_generated_batch(X_full_batch, X_sketch_batch, self.generator,
+                    x_full_batch, x_sketch_batch = next(data_utils.gen_batch(x_full_val, x_sketch_val, self.batch_size))
+                    data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
                                                     self.batch_size, self.image_data_format, "validation",
                                                     self.model_path)
 
                 self.callback_manager.on_batch_end(batch, logs={"g_loss": gen_loss[0], "d_loss": disc_loss,
-                                                                "g_l1_loss": gen_loss[1], "g_log_loss": gen_loss[2]})
+                                                                "g_l1_loss": gen_loss[1], "g_log_loss": gen_loss[2],
+                                                                "size": self.batch_size})
 
-                if batch_counter >= self.n_batch_per_epoch:
+                if batch >= self.n_batch_per_epoch:
                     break
 
-            avg_disc_loss = avg_disc_loss / batch_counter
-            avg_gen_loss = avg_gen_loss / batch_counter
+            avg_disc_loss = avg_disc_loss / self.n_batch_per_epoch
+            avg_gen_loss = avg_gen_loss / self.n_batch_per_epoch
 
-            self.callback_manager.on_epoch_end(epoch, logs={"g_loss": avg_gen_loss, "d_loss": avg_disc_loss})
-
-            print("")
-            print('Epoch %s/%s, Time: %s' % (epoch + 1, self.epochs, time.time() - start))
-
-            # if e % save_every_epoch == 0:
-            #     gen_weights_path = os.path.join(self.model_path,
-            #                                     'models/%s/gen_weights_epoch%s.h5' % (model_name, e))
-            #     self.save_weights(gen_weights_path, overwrite=True)
-            #
-            #     disc_weights_path = os.path.join(self.model_path,
-            #                                      'models/%s/disc_weights_epoch%s.h5' % (model_name, e))
-            #     self.discriminator.save_weights(disc_weights_path, overwrite=True)
-            #
-            #     DCGAN_weights_path = os.path.join(self.model_path,
-            #                                       'models/%s/DCGAN_weights_epoch%s.h5' % (model_name, e))
-            #     DCGAN_model.save_weights(DCGAN_weights_path, overwrite=True)
+            self.callback_manager.on_epoch_end(epoch + 1, logs={"g_loss": avg_gen_loss, "d_loss": avg_disc_loss})
 
         self.callback_manager.on_train_end()

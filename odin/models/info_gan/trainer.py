@@ -83,7 +83,7 @@ class InfoGAN(ModelWrapper):
 
         return model
 
-    def save(self):
+    def save(self, **kwargs):
         print("Saving not implemented here")
 
     def layers(self, force_update=False) -> [LayerWrapper]:

@@ -1,13 +1,13 @@
 import os
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 
 # from keras.models import load_model
 # import keras.backend as K
 
 import odin
+from odin.callbacks import CallbackManager
 from odin.compute import default_interface as co
 from odin.utils import dynamic_class_import
-import abc
 
 
 class LayerWrapper(object):
@@ -28,43 +28,7 @@ class LayerWrapper(object):
         return self.__class__.__name__ + " for type=%s, (%s)" % (self.type, self.original)
 
 
-class CallbackManager(abc.ABC):
-    callbacks: list
-    model = None
-    params: dict = {}
-
-    def __init__(self, callbacks):
-        self.callbacks = callbacks
-
-    def set_model(self, model):
-        self.model = model
-
-    def set_params(self, params: dict):
-        self.params = params
-
-    def add_callbacks(self, callbacks: list):
-        self.callbacks += callbacks
-
-    def on_train_begin(self, logs=None):
-        raise NotImplemented
-
-    def on_train_end(self, logs=None):
-        raise NotImplemented
-
-    def on_epoch_begin(self, epoch, logs=None):
-        raise NotImplemented
-
-    def on_epoch_end(self, epoch, logs=None):
-        raise NotImplemented
-
-    def on_batch_begin(self, batch, logs=None):
-        raise NotImplemented
-
-    def on_batch_end(self, batch, logs=None):
-        raise NotImplemented
-
-
-class ModelWrapper(object):
+class ModelWrapper(ABC):
     """
     Base class for all models. Supposed to be implementation and framework independent.
     """
@@ -72,12 +36,12 @@ class ModelWrapper(object):
     model_name = "name_not_specified"
     dataset_name = "dataset_not_specified"
     _saved_model_name = "saved_model.h5"
-    callback_manager_class = CallbackManager
-    callback_manager: callback_manager_class
+    callback_manager: CallbackManager
 
     def __init__(self, **kwargs):
         self.args = kwargs
         self.prefix = kwargs.get('prefix', "default")
+        self.verbose = kwargs.get("verbose", False)
         self.dataset = self.load_dataset()
         if len(self.dataset) == 4:
             self.x_train, self.y_train, self.x_test, self.y_test = self.dataset
@@ -85,7 +49,8 @@ class ModelWrapper(object):
         if new_model:
             self.model = self.construct()
             print("Constructed model %s" % self)
-            self.summary()
+            if self.verbose:
+                self.summary()
         else:
             self.model = self.load()
             print("Loaded model %s" % self)
@@ -95,8 +60,11 @@ class ModelWrapper(object):
 
         callbacks = kwargs.get("callbacks", [])
 
-        self.callback_manager = self.callback_manager_class(callbacks)
+        self.callback_manager = CallbackManager(callbacks)
         self.callback_manager.set_model(self.model)
+        self.callback_manager.set_model_wrapper(self)
+
+        odin.check_or_create_dir(self.model_path)
 
     def put_group(self, group, elements, experiment=None):
         """
@@ -179,7 +147,7 @@ class ModelWrapper(object):
         raise NotImplemented
 
     @abstractmethod
-    def save(self):
+    def save(self, **kwargs):
         raise NotImplemented
 
     @abstractmethod

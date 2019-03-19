@@ -47,7 +47,7 @@ def download_and_unwrap_tarball(source, name, force=False):
     target_dir = os.path.join(data_dir, name)
     if os.path.isdir(target_dir) and not force:
         return target_dir
-    tar_file = os.path.join(data_dir, name+".tar.gz")
+    tar_file = os.path.join(data_dir, name + ".tar.gz")
     logging.info("Downloading from %s to %s" % (source, target_dir))
     check_call(["mkdir", "-p", target_dir])
     check_call(["wget", "-N", source, "-O", tar_file])
@@ -63,6 +63,7 @@ class Dataset:
     name: str
     dataset: (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
     source: str
+    sample_shape: tuple
 
     def __init__(self,
                  whitening=False,
@@ -101,6 +102,18 @@ class Dataset:
 
         np.save(os.path.join(self.path, 'test_data'), data)
         np.save(os.path.join(self.path, 'test_labels'), labels)
+
+    def dummy_batch(self, batch_size, dtype=np.float32):
+        """
+        Get a batch of the same shape as the dataset but with only zeros. For testing purposes.
+        :param batch_size:
+        :param dtype:
+        :return:
+        """
+        return np.zeros(shape=(batch_size,) + self.sample_shape, dtype=dtype)
+
+    def load_dummy(self, size):
+        self.dataset = (self.dummy_batch(size), self.dummy_batch(size), self.dummy_batch(size), self.dummy_batch(size))
 
     def __len__(self):
         return 4
@@ -288,5 +301,3 @@ class Mini(Dataset):
             train, test = np.load(file)
 
         return train, test
-
-

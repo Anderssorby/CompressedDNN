@@ -44,7 +44,7 @@ class ChainerModelWrapper(ModelWrapper):
 
         return self._layers
 
-    def save(self):
+    def save(self, **kwargs):
         if not os.path.isdir(self.model_path):
             os.makedirs(self.model_path, exist_ok=True)
         chainer.serializers.save_hdf5(self.saved_model_path, self.model)

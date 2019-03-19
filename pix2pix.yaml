@@ -3,8 +3,22 @@ model: pix2pix
 #lr: 0.00005
 epochs: 100000
 plot: true
+
+# Batches
 batch_size: 100
+n_batch_per_epoch: 10
+
 generator_architecture: deconv
 prefix: test1
+# Tweaks
 label_flipping: false
-sample_interval: 100
+# How often to plot generated samples from the generator
+sample_interval: 200
+# Set to true for speeding up testing/debugging
+dummy: false
+# Get more debugging output
+verbose: true
+
+# Model checkpoints
+save_checkpoint: true
+checkpoint_interval: 200
