@@ -308,7 +308,7 @@ class Pix2Pix(KerasModelWrapper):
     dataset_name = "satellite_images"
 
     def __init__(self, batch_size=100, bn_mode=False, use_mbd=False, label_flipping=0.01, label_smoothing=True,
-                 dummy=False,
+                 dummy=False, discriminator_weights="", generator_weights="",
                  **kwargs):
         """
 
@@ -333,6 +333,9 @@ class Pix2Pix(KerasModelWrapper):
         self.label_flipping = label_flipping
         self.epochs = kwargs["epochs"]
         self.dummy = dummy
+
+        self.discriminator_weights = discriminator_weights
+        self.generator_weights = generator_weights
 
         super(Pix2Pix, self).__init__(**kwargs)
 
@@ -387,6 +390,14 @@ class Pix2Pix(KerasModelWrapper):
 
         return model
 
+    def load(self):
+        dcgan = self.construct()
+
+        self.generator.load_weights(self.find_file(self.generator_weights))
+        self.discriminator.load_weights(self.find_file(self.discriminator_weights))
+
+        return dcgan
+
     def load_dataset(self):
         dataset = data_utils.MapImageData()
         if self.dummy:
@@ -412,6 +423,30 @@ class Pix2Pix(KerasModelWrapper):
         dcgan_weights_path = os.path.join(self.model_path,
                                           'DCGAN_weights_epoch:{epoch}.h5'.format(epoch=epoch, **kwargs))
         self.model.save_weights(dcgan_weights_path, overwrite=True)
+
+    def test(self, **options):
+        epoch = -1
+        num = 20
+        _, _, x_full_val, x_sketch_val = self.dataset
+        x_full_batch = x_full_val[:num]
+        x_sketch_batch = x_sketch_val[:num]
+
+        data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
+                                        self.batch_size, self.image_data_format, "training",
+                                        self.model_path, epoch)
+
+        x_disc, y_disc = data_utils.get_disc_batch(x_full_batch,
+                                                   x_sketch_batch,
+                                                   self.generator,
+                                                   0,
+                                                   self.patch_size,
+                                                   self.image_data_format,
+                                                   label_smoothing=self.label_smoothing,
+                                                   label_flipping=self.label_flipping)
+
+        disc_loss = self.discriminator.test_on_batch(x_disc, y_disc)
+
+        return disc_loss
 
     def train(self, **kwargs):
         """

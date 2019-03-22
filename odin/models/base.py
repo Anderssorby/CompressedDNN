@@ -1,13 +1,14 @@
 import os
 from abc import abstractmethod, ABC
 
-# from keras.models import load_model
-# import keras.backend as K
-
 import odin
 from odin.callbacks import CallbackManager
 from odin.compute import default_interface as co
 from odin.utils import dynamic_class_import
+
+
+# from keras.models import load_model
+# import keras.backend as K
 
 
 class LayerWrapper(object):
@@ -65,6 +66,19 @@ class ModelWrapper(ABC):
         self.callback_manager.set_model_wrapper(self)
 
         odin.check_or_create_dir(self.model_path)
+
+    def find_file(self, file):
+        """
+        :raises: ValueError if file is not a file or in model_path
+        :param file: filename
+        :return: A verified filename
+        """
+        if not os.path.isfile(file):
+            file = os.path.join(self.model_path, file)
+            if not os.path.isfile(file):
+                raise ValueError("File not found: %s" % file)
+
+        return file
 
     def put_group(self, group, elements, experiment=None):
         """

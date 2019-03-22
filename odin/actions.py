@@ -294,7 +294,7 @@ def test_model(**kwargs):
     :return:
     """
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
-    scores = model_wrapper.test()
+    scores = model_wrapper.test(**kwargs)
     print('Test loss:', scores[0])
     print('Test accuracy:', scores[1])
 
