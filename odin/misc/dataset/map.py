@@ -306,7 +306,7 @@ def get_disc_batch(x_full_batch, x_sketch_batch, generator_model, batch_counter,
     return x_disc, y_disc
 
 
-def plot_generated_batch(X_full, X_sketch, generator_model, batch_size, image_data_format, suffix, logging_dir):
+def plot_generated_batch(X_full, X_sketch, generator_model, batch_size, image_data_format, suffix, logging_dir, epoch):
     # Generate images
     X_gen = generator_model.predict(X_sketch)
 
@@ -342,6 +342,7 @@ def plot_generated_batch(X_full, X_sketch, generator_model, batch_size, image_da
     else:
         oplt.imshow(Xr)
     oplt.axis("off")
-    oplt.savefig(os.path.join(logging_dir, "figures/current_batch_%s.png" % suffix))
+    oplt.savefig(
+        os.path.join(logging_dir, "figures/{epoch}_current_batch_{suffix}.png".format(suffix=suffix, epoch=epoch)))
     oplt.clf()
     oplt.close()

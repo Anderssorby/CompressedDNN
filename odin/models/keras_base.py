@@ -100,7 +100,7 @@ class KerasModelWrapper(ModelWrapper, ABC):
 
         self.history = self.model.fit(x_train, y_train, epochs=epochs, verbose=1)
 
-    def test(self):
+    def test(self, **options):
         (_, _), (x_test, y_test) = self.load_dataset()
 
         scores = self.model.test_on_batch(x_test, y_test)

@@ -488,11 +488,11 @@ class Pix2Pix(KerasModelWrapper):
                     # Get new images from validation
                     data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
                                                     self.batch_size, self.image_data_format, "training",
-                                                    self.model_path)
+                                                    self.model_path, epoch)
                     x_full_batch, x_sketch_batch = next(data_utils.gen_batch(x_full_val, x_sketch_val, self.batch_size))
                     data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
                                                     self.batch_size, self.image_data_format, "validation",
-                                                    self.model_path)
+                                                    self.model_path, epoch)
 
                 self.callback_manager.on_batch_end(batch, logs={"g_loss": gen_loss[0], "d_loss": disc_loss,
                                                                 "g_l1_loss": gen_loss[1], "g_log_loss": gen_loss[2],
