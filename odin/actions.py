@@ -295,8 +295,12 @@ def test_model(**kwargs):
     """
     model_wrapper = load_model(kwargs.get("model"), **kwargs)
     scores = model_wrapper.test(**kwargs)
-    print('Test loss:', scores[0])
-    print('Test accuracy:', scores[1])
+
+    if len(scores) >= 2:
+        print('Test loss:', scores[0])
+        print('Test accuracy:', scores[1])
+    else:
+        print('Test score:', scores)
 
     return scores
 

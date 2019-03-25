@@ -5,7 +5,6 @@ from odin.misc.dataset import load_dataset
 from odin.models.base import ModelWrapper, LayerWrapper
 import keras.models
 from keras import backend
-from keras.utils import plot_model
 from keras.utils.vis_utils import model_to_dot
 import odin.callbacks
 
@@ -13,7 +12,8 @@ import odin.callbacks
 class KerasLayer(LayerWrapper):
     layer_types = {
         "Dense": "fully_connected",
-        "Conv2D": "convolution"
+        "Conv2D": "convolution",
+        "Lambda": "lambda"
     }
 
     def __init__(self, layer):
@@ -109,12 +109,13 @@ class KerasModelWrapper(ModelWrapper, ABC):
     def load_dataset(self):
         return load_dataset(self.dataset_name, options=self.args)
 
-    def show(self, format="svg"):
-        if format == "png":
-            return plot_model(self.model, show_shapes=True, to_file=self.model_name + ".png")
-        elif format == "svg":
-            dot = model_to_dot(self.model, show_shapes=True).create(prog='dot', format='svg')
-            return dot
+    def show(self, file_format="svg"):
+        to_file = odin.check_or_create_dir(self.model_path, file=self.model_name + ".png")
+
+        dot = model_to_dot(self.model, show_shapes=True)
+
+        dot.write(to_file, format=file_format)
+        return dot
 
     def summary(self):
         return self.model.summary()

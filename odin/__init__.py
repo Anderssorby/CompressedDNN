@@ -17,13 +17,15 @@ model_wrapper = None  # For convenience when testing
 config = {}
 
 
-def check_or_create_dir(*d):
+def check_or_create_dir(*d, file=None):
     if len(d) > 1:
         d = os.path.join(*d)
     else:
         d = d[0]
     if not os.path.isdir(d):
         os.makedirs(d)
+    if file:
+        d = os.path.join(d, file)
     return d
 
 

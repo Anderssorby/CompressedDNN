@@ -7,10 +7,6 @@ from odin.compute import default_interface as co
 from odin.utils import dynamic_class_import
 
 
-# from keras.models import load_model
-# import keras.backend as K
-
-
 class LayerWrapper(object):
     """
     Wrapper for layers in a network
@@ -132,6 +128,86 @@ class ModelWrapper(ABC):
     def get_element(self, group, element_name):
         self.get_group(group)
         return self._elements[group][element_name]
+
+    def model_to_dot(self,
+                     show_shapes=False,
+                     show_layer_names=True,
+                     rankdir='TB'):
+        """Convert a model to dot format.
+
+        # Arguments
+            show_shapes: whether to display shape information.
+            show_layer_names: whether to display layer names.
+            rankdir: `rankdir` argument passed to PyDot,
+                a string specifying the format of the plot:
+                'TB' creates a vertical plot;
+                'LR' creates a horizontal plot.
+
+        # Returns
+            A `pydot.Dot` instance representing the model.
+        """
+        # TODO Potential rewrite of keras code
+        # from ..layers.wrappers import Wrapper
+        # from ..models import Sequential
+
+        import pydot
+        dot = pydot.Dot()
+        dot.set('rankdir', rankdir)
+        dot.set('concentrate', True)
+        dot.set_node_defaults(shape='record')
+
+        if type(self.model).__name__ == "Sequential":
+            if not self.model.built:
+                self.model.build()
+        layers: [LayerWrapper] = self.layers()
+
+        # Create graph nodes.
+        for layer in layers:
+            layer_id = str(id(layer))
+
+            # Append a wrapped layer's label to node's label, if it exists.
+            layer_name = layer.name
+            class_name = layer.type
+            if isinstance(layer, LayerWrapper):
+                layer_name = '{}({})'.format(layer_name, layer.original.name)
+                child_class_name = layer.original.__class__.__name__
+                class_name = '{}({})'.format(class_name, child_class_name)
+
+            # Create node's label.
+            if show_layer_names:
+                label = '{}: {}'.format(layer_name, class_name)
+            else:
+                label = class_name
+
+            # Rebuild the label as a table including input/output shapes.
+            if show_shapes:
+                try:
+                    outputlabels = str(layer.output_shape)
+                except AttributeError:
+                    outputlabels = 'multiple'
+                if hasattr(layer, 'input_shape'):
+                    inputlabels = str(layer.input_shape)
+                elif hasattr(layer, 'input_shapes'):
+                    inputlabels = ', '.join(
+                        [str(ishape) for ishape in layer.input_shapes])
+                else:
+                    inputlabels = 'multiple'
+                label = '%s\n|{input:|output:}|{{%s}|{%s}}' % (label,
+                                                               inputlabels,
+                                                               outputlabels)
+            node = pydot.Node(layer_id, label=label)
+            dot.add_node(node)
+
+        # Connect nodes with edges.
+        for layer in layers:
+            layer_id = str(id(layer))
+            for i, node in enumerate(layer.original._inbound_nodes):
+                node_key = layer.name + '_ib-' + str(i)
+                if node_key in self.model._network_nodes:
+                    for inbound_layer in node.inbound_layers:
+                        inbound_layer_id = str(id(inbound_layer))
+                        dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+        return dot
 
     @abstractmethod
     def load(self):

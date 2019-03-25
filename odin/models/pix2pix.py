@@ -1,6 +1,5 @@
 import keras.backend as K
 import numpy as np
-import time
 import os
 from keras.layers import Input, Concatenate
 from keras.layers.advanced_activations import LeakyReLU
@@ -12,7 +11,8 @@ from keras.optimizers import Adam
 
 from .keras_base import KerasModelWrapper
 import odin
-import odin.misc.dataset.map as data_utils
+import odin.plot as oplt
+import odin.misc.dataset.map as map_data_utils
 
 
 def l1_loss(y_true, y_pred):
@@ -324,7 +324,7 @@ class Pix2Pix(KerasModelWrapper):
         self.generator_arch = kwargs["generator_architecture"]
         self.image_data_format = "channels_last"
         self.img_shape = (256, 256, 3)
-        self.patch_size = (64, 64)  # kwargs["patch_size"]
+        self.patch_size = (64, 64)
         self.bn_mode = bn_mode
         self.use_mbd = use_mbd
         self.do_plot = kwargs["plot"]
@@ -342,7 +342,7 @@ class Pix2Pix(KerasModelWrapper):
     def construct(self):
 
         # Get the number of non overlapping patch and the size of input image to the discriminator
-        nb_patch, img_dim_disc = data_utils.get_nb_patch(self.img_shape, self.patch_size, self.image_data_format)
+        nb_patch, img_dim_disc = map_data_utils.get_nb_patch(self.img_shape, self.patch_size, self.image_data_format)
 
         # Create optimizers
         opt_dcgan = Adam(lr=1E-3, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
@@ -357,11 +357,34 @@ class Pix2Pix(KerasModelWrapper):
         self.generator.compile(loss='mae', optimizer=opt_discriminator)
         self.discriminator.trainable = False
 
-        model = DCGAN(self.generator,
-                      self.discriminator,
-                      self.img_shape,
-                      self.patch_size,
-                      self.image_data_format)
+        gen_input = Input(shape=self.img_shape, name="DCGAN_input")
+
+        generated_image = self.generator(gen_input)
+
+        if self.image_data_format == "channels_first":
+            h, w = self.img_shape[1:]
+        else:
+            h, w = self.img_shape[:-1]
+        ph, pw = self.patch_size
+
+        # Split the image into patches for the discriminator
+        list_row_idx = [(i * ph, (i + 1) * ph) for i in range(h // ph)]
+        list_col_idx = [(i * pw, (i + 1) * pw) for i in range(w // pw)]
+
+        list_gen_patch = []
+        for row_idx in list_row_idx:
+            for col_idx in list_col_idx:
+                if self.image_data_format == "channels_last":
+                    x_patch = Lambda(lambda z: z[:, row_idx[0]:row_idx[1], col_idx[0]:col_idx[1], :])(generated_image)
+                else:
+                    x_patch = Lambda(lambda z: z[:, :, row_idx[0]:row_idx[1], col_idx[0]:col_idx[1]])(generated_image)
+                list_gen_patch.append(x_patch)
+
+        output = self.discriminator(list_gen_patch)
+
+        model = Model(inputs=[gen_input],
+                      outputs=[generated_image, output],
+                      name="DCGAN")
 
         if self.verbose:
             print("Discriminator summary")
@@ -399,7 +422,7 @@ class Pix2Pix(KerasModelWrapper):
         return dcgan
 
     def load_dataset(self):
-        dataset = data_utils.MapImageData()
+        dataset = map_data_utils.MapImageData()
         if self.dummy:
             dataset.load_dummy(self.batch_size * 2)
         else:
@@ -431,22 +454,91 @@ class Pix2Pix(KerasModelWrapper):
         x_full_batch = x_full_val[:num]
         x_sketch_batch = x_sketch_val[:num]
 
-        data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
-                                        self.batch_size, self.image_data_format, "training",
-                                        self.model_path, epoch)
+        self.plot_generated_batch(x_full_batch, x_sketch_batch, "validation", epoch)
 
-        x_disc, y_disc = data_utils.get_disc_batch(x_full_batch,
-                                                   x_sketch_batch,
-                                                   self.generator,
-                                                   0,
-                                                   self.patch_size,
-                                                   self.image_data_format,
-                                                   label_smoothing=self.label_smoothing,
-                                                   label_flipping=self.label_flipping)
+        x_disc, y_disc = self.get_disc_batch(x_full_batch,
+                                             x_sketch_batch,
+                                             generate=True)
 
         disc_loss = self.discriminator.test_on_batch(x_disc, y_disc)
 
-        return disc_loss
+        x_gen_target, x_gen = next(map_data_utils.random_batch(x_full_val, x_sketch_val, num))
+        y_gen = np.zeros((x_gen.shape[0], 2), dtype=np.uint8)
+        y_gen[:, 1] = 1
+
+        gen_loss = self.model.test_on_batch(x_gen, [x_gen_target, y_gen])
+
+        return disc_loss, gen_loss
+
+    def get_disc_batch(self, x_full_batch, x_sketch_batch, generate: bool):
+        # Create x_disc: alternatively only generated or real images
+        if generate:
+            # Produce an output
+            x_disc = self.generator.predict(x_sketch_batch)
+            y_disc = np.zeros((x_disc.shape[0], 2), dtype=np.uint8)
+            y_disc[:, 0] = 1
+
+        else:
+            x_disc = x_full_batch
+            y_disc = np.zeros((x_disc.shape[0], 2), dtype=np.uint8)
+            if self.label_smoothing:
+                y_disc[:, 1] = np.random.uniform(low=0.9, high=1, size=y_disc.shape[0])
+            else:
+                y_disc[:, 1] = 1
+
+        if self.label_flipping > 0:
+            p = np.random.binomial(1, self.label_flipping)
+            if p > 0:
+                y_disc[:, [0, 1]] = y_disc[:, [1, 0]]
+
+        # Now extract patches form x_disc
+        x_disc = map_data_utils.extract_patches(x_disc, self.image_data_format, self.patch_size)
+
+        return x_disc, y_disc
+
+    def plot_generated_batch(self, x_full, x_sketch, suffix,
+                             epoch):
+        # Generate images
+        x_gen = self.generator.predict(x_sketch)
+
+        x_sketch = map_data_utils.inverse_normalization(x_sketch)
+        x_full = map_data_utils.inverse_normalization(x_full)
+        x_gen = map_data_utils.inverse_normalization(x_gen)
+
+        xs = x_sketch[:8]
+        xg = x_gen[:8]
+        xr = x_full[:8]
+
+        # if self.image_data_format == "channels_last":
+        x = np.concatenate((xs, xg, xr), axis=0)
+        list_rows = []
+        for i in range(int(x.shape[0] // 4)):
+            xr = np.concatenate([x[k] for k in range(4 * i, 4 * (i + 1))], axis=1)
+            list_rows.append(xr)
+
+        xr = np.concatenate(list_rows, axis=0)
+
+        # if self.image_data_format == "channels_first":
+        #     x = np.concatenate((xs, xg, xr), axis=0)
+        #     list_rows = []
+        #     for i in range(int(x.shape[0] // 4)):
+        #         xr = np.concatenate([x[k] for k in range(4 * i, 4 * (i + 1))], axis=2)
+        #         list_rows.append(xr)
+        #
+        #     xr = np.concatenate(list_rows, axis=1)
+        #     xr = xr.transpose((1, 2, 0))
+
+        if xr.shape[-1] == 1:
+            oplt.imshow(xr[:, :, 0], cmap="gray")
+        else:
+            oplt.imshow(xr)
+        oplt.axis("off")
+        oplt.savefig(odin.check_or_create_dir(self.model_path,
+                                              "figures",
+                                              file="{epoch}_current_batch_{suffix}.png".format(suffix=suffix,
+                                                                                               epoch=epoch)))
+        oplt.clf()
+        oplt.close()
 
     def train(self, **kwargs):
         """
@@ -465,21 +557,28 @@ class Pix2Pix(KerasModelWrapper):
         # Load and rescale data
         x_full_train, x_sketch_train, x_full_val, x_sketch_val = self.dataset
 
-        dataset_size = x_full_train.shape[0]
+        dataset_size = self.dataset.size
         steps_per_epoch = dataset_size // self.batch_size
         self.callback_manager.set_params({
             'batch_size': self.batch_size,
             'epochs': self.epochs,
-            'verbose': 2 if self.verbose else 1,
+            'verbose': 1,
             'samples': dataset_size,
             'steps': steps_per_epoch,
             'do_validation': False,
             'metrics': ["d_loss", "g_loss", "g_l1_loss", "g_log_loss"],
         })
 
+        problem_type = "image_to_sketch"
+        if problem_type == "image_to_sketch":
+            x_target = x_sketch_train
+            y_input_condition = x_full_train
+        else:  # problem_type == "sketch_to_image"
+            x_target = x_full_train
+            y_input_condition = x_sketch_train
+
         self.n_batch_per_epoch = min(steps_per_epoch, self.n_batch_per_epoch)
         self.callback_manager.set_model(self.model)
-        # img_dim = x_full_train.shape[-3:]
 
         self.callback_manager.on_train_begin()
         # Start training
@@ -490,24 +589,21 @@ class Pix2Pix(KerasModelWrapper):
             avg_disc_loss = 0
 
             for batch, (x_full_batch, x_sketch_batch) in enumerate(
-                    data_utils.gen_batch(x_full_train, x_sketch_train, self.batch_size), start=1):
+                    map_data_utils.random_batch(x_target, y_input_condition, self.batch_size), start=1):
                 self.callback_manager.on_batch_begin(batch)
+
                 # Create a batch to feed the discriminator model
-                x_disc, y_disc = data_utils.get_disc_batch(x_full_batch,
-                                                           x_sketch_batch,
-                                                           self.generator,
-                                                           batch,
-                                                           self.patch_size,
-                                                           self.image_data_format,
-                                                           label_smoothing=self.label_smoothing,
-                                                           label_flipping=self.label_flipping)
+                x_disc, y_disc = self.get_disc_batch(x_full_batch,
+                                                     x_sketch_batch,
+                                                     # alternate between generated and real samples
+                                                     generate=batch % 2 == 0)
 
                 # Update the discriminator
                 disc_loss = self.discriminator.train_on_batch(x_disc, y_disc)
                 avg_disc_loss += disc_loss
 
                 # Create a batch to feed the generator model
-                x_gen_target, x_gen = next(data_utils.gen_batch(x_full_train, x_sketch_train, self.batch_size))
+                x_gen_target, x_gen = next(map_data_utils.random_batch(x_target, y_input_condition, self.batch_size))
                 y_gen = np.zeros((x_gen.shape[0], 2), dtype=np.uint8)
                 y_gen[:, 1] = 1
 
@@ -521,13 +617,12 @@ class Pix2Pix(KerasModelWrapper):
                 # Save images for visualization
                 if batch % (self.n_batch_per_epoch / 2) == 0:
                     # Get new images from validation
-                    data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
-                                                    self.batch_size, self.image_data_format, "training",
-                                                    self.model_path, epoch)
-                    x_full_batch, x_sketch_batch = next(data_utils.gen_batch(x_full_val, x_sketch_val, self.batch_size))
-                    data_utils.plot_generated_batch(x_full_batch, x_sketch_batch, self.generator,
-                                                    self.batch_size, self.image_data_format, "validation",
-                                                    self.model_path, epoch)
+                    self.plot_generated_batch(x_full_batch, x_sketch_batch, "training",
+                                              epoch)
+                    x_full_batch, x_sketch_batch = next(
+                        map_data_utils.random_batch(x_full_val, x_sketch_val, self.batch_size))
+                    self.plot_generated_batch(x_full_batch, x_sketch_batch, "validation",
+                                              epoch)
 
                 self.callback_manager.on_batch_end(batch, logs={"g_loss": gen_loss[0], "d_loss": disc_loss,
                                                                 "g_l1_loss": gen_loss[1], "g_log_loss": gen_loss[2],

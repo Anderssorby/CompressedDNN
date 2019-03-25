@@ -9,7 +9,7 @@ batch_size: 100
 n_batch_per_epoch: 10
 
 generator_architecture: deconv
-prefix: test1
+prefix: arial_to_sketch
 # Tweaks
 label_flipping: false
 # How often to plot generated samples from the generator

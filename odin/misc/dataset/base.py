@@ -65,6 +65,8 @@ class Dataset:
     source: str
     sample_shape: tuple
 
+    size: int
+
     def __init__(self,
                  whitening=False,
                  prompt=True, **kwargs):
@@ -72,6 +74,7 @@ class Dataset:
         self.whitening = whitening
         self.prompt = prompt
         self.args = kwargs
+        self.size = None
 
     def _extract_train(self):
         # type: () -> (list, list)
@@ -114,6 +117,7 @@ class Dataset:
 
     def load_dummy(self, size):
         self.dataset = (self.dummy_batch(size), self.dummy_batch(size), self.dummy_batch(size), self.dummy_batch(size))
+        self.size = size
 
     def __len__(self):
         return 4
@@ -132,7 +136,7 @@ class Dataset:
                 self._download()
 
                 self._prepare_and_save()
-            except Exception:
+            except IOError:
                 print("Cleaning up broken dir ".join(self.path))
                 # check_call(["rm", "-rf", self.path])
 
@@ -259,12 +263,6 @@ class MNIST(Dataset):
         for i, source in enumerate(sources):
             print("Downloading %d of 4" % (i + 1))
             download_and_unwrap_tarball(source)
-
-    def __len__(self):
-        return 4
-
-    def __getitem__(self, item):
-        return self.dataset[item]
 
     def load(self, is_chainer=False):
 
