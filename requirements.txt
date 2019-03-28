@@ -14,7 +14,7 @@ parmap
 pyyaml
 
 # Homology computation
-phat
+# phat
 
 # Deep learning frameworks
 chainer

@@ -16,6 +16,27 @@ model_wrapper = None  # For convenience when testing
 
 config = {}
 
+ascii_logo = """
+
+                               dddddddd                          
+     OOOOOOOOO                 d::::::d  iiii                    
+   OO:::::::::OO               d::::::d i::::i                   
+ OO:::::::::::::OO             d::::::d  iiii                    
+O:::::::OOO:::::::O            d:::::d                           
+O::::::O   O::::::O    ddddddddd:::::d iiiiiii nnnn  nnnnnnnn    
+O:::::O     O:::::O  dd::::::::::::::d i:::::i n:::nn::::::::nn  
+O:::::O     O:::::O d::::::::::::::::d  i::::i n::::::::::::::nn 
+O:::::O     O:::::Od:::::::ddddd:::::d  i::::i nn:::::::::::::::n
+O:::::O     O:::::Od::::::d    d:::::d  i::::i   n:::::nnnn:::::n
+O:::::O     O:::::Od:::::d     d:::::d  i::::i   n::::n    n::::n
+O:::::O     O:::::Od:::::d     d:::::d  i::::i   n::::n    n::::n
+O::::::O   O::::::Od:::::d     d:::::d  i::::i   n::::n    n::::n
+O:::::::OOO:::::::Od::::::ddddd::::::ddi::::::i  n::::n    n::::n
+ OO:::::::::::::OO  d:::::::::::::::::di::::::i  n::::n    n::::n
+   OO:::::::::OO     d:::::::::ddd::::di::::::i  n::::n    n::::n
+     OOOOOOOOO        ddddddddd   dddddiiiiiiii  nnnnnn    nnnnnn
+                                                                 
+"""
 
 def check_or_create_dir(*d, file=None):
     if len(d) > 1:
@@ -56,6 +77,7 @@ def default_save_path(name, category="", experiment=None):
 def update_config(new_args):
     config.update(new_args)
 
+print(ascii_logo)
 
 import odin.models
 import odin.actions
