@@ -1,15 +1,16 @@
-import numpy as np
-import h5py
-
 import os
+from pathlib import Path
+
+# For processing
+import cv2
+import h5py
+import numpy as np
+import parmap
+from tqdm import tqdm as tqdm
+
 import odin
 import odin.plot as oplt
 from .base import Dataset, download_and_unwrap_tarball
-# For processing
-import cv2
-from pathlib import Path
-import parmap
-from tqdm import tqdm as tqdm
 
 
 def normalization(x):
@@ -226,51 +227,55 @@ class MapImageData(Dataset):
 
     sample_shape = (256, 256, 3)
 
-    def __init__(self):
+    def __init__(self, problem_type="image_to_sketch", limit=-1):
+        self.problem_type = problem_type
+        self.limit = limit
         super(MapImageData, self).__init__()
 
     def load(self):
         print("Starting to load dataset")
         # dset = "maps"
         image_data_format = "channels_last"
-        limit = -1  # 10
+        limit = self.limit
 
         path = build_hdf5()
 
         with h5py.File(path, "r") as hf:
             print("File loaded")
 
-            x_full_train = hf["train_data_full"][:limit].astype(np.float32)
-            x_full_train = normalization(x_full_train)
+            x_image_train = hf["train_data_full"][:limit].astype(np.float32)
+            x_image_train = normalization(x_image_train)
 
             x_sketch_train = hf["train_data_sketch"][:limit].astype(np.float32)
             x_sketch_train = normalization(x_sketch_train)
 
             if image_data_format == "channels_last":
-                x_full_train = x_full_train.transpose(0, 2, 3, 1)
+                x_image_train = x_image_train.transpose(0, 2, 3, 1)
                 x_sketch_train = x_sketch_train.transpose(0, 2, 3, 1)
 
-            x_full_val = hf["val_data_full"][:limit].astype(np.float32)
-            x_full_val = normalization(x_full_val)
+            x_image_val = hf["val_data_full"][:limit].astype(np.float32)
+            x_image_val = normalization(x_image_val)
 
             x_sketch_val = hf["val_data_sketch"][:limit].astype(np.float32)
             x_sketch_val = normalization(x_sketch_val)
 
             if image_data_format == "channels_last":
-                x_full_val = x_full_val.transpose(0, 2, 3, 1)
+                x_image_val = x_image_val.transpose(0, 2, 3, 1)
                 x_sketch_val = x_sketch_val.transpose(0, 2, 3, 1)
 
-            print("Dataset loaded")
-            self.size = x_full_train.shape[0]
+            if self.problem_type == "image_to_sketch":
+                x_target = x_sketch_train
+                y_input_condition = x_image_train
+                x_target_val = x_sketch_val
+                y_input_condition_val = x_image_val
+            else:  # problem_type == "sketch_to_image"
+                x_target = x_image_train
+                y_input_condition = x_sketch_train
+                x_target_val = x_image_val
+                y_input_condition_val = x_sketch_val
 
-            self.dataset = x_full_train, x_sketch_train, x_full_val, x_sketch_val
+            print("Dataset loaded")
+
+            self.dataset = x_target, y_input_condition, x_target_val, y_input_condition_val
 
             return self.dataset
-
-
-def random_batch(X1, X2, batch_size):
-    while True:
-        idx = np.random.choice(X1.shape[0], batch_size, replace=False)
-        yield X1[idx], X2[idx]
-
-

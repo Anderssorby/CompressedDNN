@@ -117,7 +117,6 @@ class Dataset:
 
     def load_dummy(self, size):
         self.dataset = (self.dummy_batch(size), self.dummy_batch(size), self.dummy_batch(size), self.dummy_batch(size))
-        self.size = size
 
     def __len__(self):
         return 4
@@ -146,6 +145,20 @@ class Dataset:
         test_labels = np.load(os.path.join(self.path, 'test_labels.npy'))
 
         return train_data, train_labels, test_data, test_labels
+
+    def generate_random_batch(self, batch_size, data_type="test"):
+        if data_type == "test":
+            _, _, x, y = self.dataset
+        else:
+            x, y, _, _ = self.dataset
+
+        while True:
+            idx = np.random.choice(x.shape[0], batch_size, replace=False)
+            yield x[idx], y[idx]
+
+    @property
+    def size(self):
+        return self.dataset[0].shape[0]
 
 
 class Cifar10(Dataset):

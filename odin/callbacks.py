@@ -1,9 +1,10 @@
 import abc
+import time
+import warnings
+from collections import deque
 
 import numpy as np
-import warnings
-import time
-from collections import deque
+
 from odin.utils.progbar import Progbar
 
 
@@ -19,7 +20,6 @@ class Callback(abc.ABC):
         self.model_wrapper = None
 
     def __call__(self, event="", *args, **kwargs):
-
         if hasattr(self, event):
             return getattr(self, event)(*args, **kwargs)
 
@@ -57,6 +57,30 @@ class TrainingCallback(Callback, abc.ABC):
 
     def on_train_end(self, logs=None):
         pass
+
+
+class GANSampler(TrainingCallback):
+
+    def __init__(self, period=1, batch_size=100):
+        self.batch_size = batch_size
+        self.period = period
+        self.epochs_since_last_sample = 0
+        super(GANSampler, self).__init__()
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.epochs_since_last_sample += 1
+        if self.epochs_since_last_sample >= self.period:
+            self.epochs_since_last_sample = 0
+
+            dataset = self.model_wrapper.dataset
+            x_target, y_input_condition = next(
+                dataset.generate_random_batch(self.batch_size, data_type="train"))
+            self.model_wrapper.plot_generated_batch(x_target, y_input_condition, "training",
+                                                    epoch)
+            x_full_batch, x_sketch_batch = next(
+                dataset.generate_random_batch(self.batch_size, data_type="test"))
+            self.model_wrapper.plot_generated_batch(x_full_batch, x_sketch_batch, "validation",
+                                                    epoch)
 
 
 class ModelCheckpoint(TrainingCallback):
@@ -321,8 +345,8 @@ class CallbackManager(object):
         self._delta_ts_batch_begin.append(time.time() - t_before_callbacks)
         delta_t_median = np.median(self._delta_ts_batch_begin)
         if (self._delta_t_batch > 0. and
-           delta_t_median > 0.95 * self._delta_t_batch and
-           delta_t_median > 0.1):
+                delta_t_median > 0.95 * self._delta_t_batch and
+                delta_t_median > 0.1):
             warnings.warn('Method on_batch_begin() is slow compared '
                           'to the batch update (%f). Check your callbacks.'
                           % delta_t_median)
@@ -345,7 +369,7 @@ class CallbackManager(object):
         self._delta_ts_batch_end.append(time.time() - t_before_callbacks)
         delta_t_median = np.median(self._delta_ts_batch_end)
         if (self._delta_t_batch > 0. and
-           (delta_t_median > 0.95 * self._delta_t_batch and delta_t_median > 0.1)):
+                (delta_t_median > 0.95 * self._delta_t_batch and delta_t_median > 0.1)):
             warnings.warn('Method on_batch_end() is slow compared '
                           'to the batch update (%f). Check your callbacks.'
                           % delta_t_median)

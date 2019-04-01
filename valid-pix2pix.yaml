@@ -1,14 +1,14 @@
 action: test_model
 model: pix2pix
-prefix: test1
+prefix: arial_to_sketch
 new_model: false
 plot: true
 
 generator_architecture: deconv
 
 # Weight files
-generator_weights: gen_weights_epoch:5200-loss:3.031.h5
-discriminator_weights: disc_weights_epoch:5200-loss:0.563.h5
+generator_weights: gen_weights_epoch:1000-loss:1.860.h5
+discriminator_weights: disc_weights_epoch:1000-loss:0.563.h5
 
 # Set to true for speeding up testing/debugging
 dummy: false

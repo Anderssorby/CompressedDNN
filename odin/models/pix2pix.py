@@ -339,6 +339,26 @@ class Pix2Pix(KerasModelWrapper):
 
         super(Pix2Pix, self).__init__(**kwargs)
 
+        self.callback_manager.add_callbacks([
+            odin.callbacks.ProgbarLogger(count_mode='samples',
+                                         stateful_metrics=["d_loss", "g_loss", "g_l1_loss", "g_log_loss"]),
+            odin.callbacks.GANSampler(period=kwargs.get("sample_interval", 1))
+        ])
+
+        dataset_size = self.dataset.size
+        steps_per_epoch = dataset_size // self.batch_size
+        self.callback_manager.set_params({
+            'batch_size': self.batch_size,
+            'epochs': self.epochs,
+            'verbose': 1,
+            'samples': dataset_size,
+            'steps': steps_per_epoch,
+            'do_validation': False,
+            'metrics': ["d_loss", "g_loss", "g_l1_loss", "g_log_loss"],
+        })
+
+        self.n_batch_per_epoch = min(steps_per_epoch, self.n_batch_per_epoch)
+
     def construct(self):
 
         # Get the number of non overlapping patch and the size of input image to the discriminator
@@ -496,18 +516,18 @@ class Pix2Pix(KerasModelWrapper):
 
         return x_disc, y_disc
 
-    def plot_generated_batch(self, x_full, x_sketch, suffix,
+    def plot_generated_batch(self, x_target, y_condition, suffix,
                              epoch):
         # Generate images
-        x_gen = self.generator.predict(x_sketch)
+        x_gen = self.generator.predict(y_condition)
 
-        x_sketch = map_data_utils.inverse_normalization(x_sketch)
-        x_full = map_data_utils.inverse_normalization(x_full)
+        y_condition = map_data_utils.inverse_normalization(y_condition)
+        x_target = map_data_utils.inverse_normalization(x_target)
         x_gen = map_data_utils.inverse_normalization(x_gen)
 
-        xs = x_sketch[:8]
+        xs = y_condition[:8]
         xg = x_gen[:8]
-        xr = x_full[:8]
+        xr = x_target[:8]
 
         # if self.image_data_format == "channels_last":
         x = np.concatenate((xs, xg, xr), axis=0)
@@ -528,11 +548,18 @@ class Pix2Pix(KerasModelWrapper):
         #     xr = np.concatenate(list_rows, axis=1)
         #     xr = xr.transpose((1, 2, 0))
 
-        if xr.shape[-1] == 1:
-            oplt.imshow(xr[:, :, 0], cmap="gray")
-        else:
-            oplt.imshow(xr)
-        oplt.axis("off")
+        columns = 4
+
+        oplt.figure()
+
+        for i, xs in enumerate(x):
+            oplt.subplot((i // columns, i % columns, i))
+
+            if xr.shape[-1] == 1:
+                oplt.imshow(xr[:, :, 0], cmap="gray")
+            else:
+                oplt.imshow(xr)
+        # oplt.axis("off")
         oplt.savefig(odin.check_or_create_dir(self.model_path,
                                               "figures",
                                               file="{epoch}_current_batch_{suffix}.png".format(suffix=suffix,
@@ -549,36 +576,8 @@ class Pix2Pix(KerasModelWrapper):
         args: **kwargs (dict) keyword arguments that specify the model hyper parameters
         """
 
-        self.callback_manager.add_callbacks([
-            odin.callbacks.ProgbarLogger(count_mode='samples',
-                                         stateful_metrics=["d_loss", "g_loss", "g_l1_loss", "g_log_loss"])
-        ])
-
         # Load and rescale data
-        x_full_train, x_sketch_train, x_full_val, x_sketch_val = self.dataset
-
-        dataset_size = self.dataset.size
-        steps_per_epoch = dataset_size // self.batch_size
-        self.callback_manager.set_params({
-            'batch_size': self.batch_size,
-            'epochs': self.epochs,
-            'verbose': 1,
-            'samples': dataset_size,
-            'steps': steps_per_epoch,
-            'do_validation': False,
-            'metrics': ["d_loss", "g_loss", "g_l1_loss", "g_log_loss"],
-        })
-
-        problem_type = "image_to_sketch"
-        if problem_type == "image_to_sketch":
-            x_target = x_sketch_train
-            y_input_condition = x_full_train
-        else:  # problem_type == "sketch_to_image"
-            x_target = x_full_train
-            y_input_condition = x_sketch_train
-
-        self.n_batch_per_epoch = min(steps_per_epoch, self.n_batch_per_epoch)
-        self.callback_manager.set_model(self.model)
+        # x_target, y_input_condition, x_target_val, y_input_condition_val = self.dataset
 
         self.callback_manager.on_train_begin()
         # Start training
@@ -589,7 +588,7 @@ class Pix2Pix(KerasModelWrapper):
             avg_disc_loss = 0
 
             for batch, (x_full_batch, x_sketch_batch) in enumerate(
-                    map_data_utils.random_batch(x_target, y_input_condition, self.batch_size), start=1):
+                    self.dataset.generate_random_batch(self.batch_size, data_type="train"), start=1):
                 self.callback_manager.on_batch_begin(batch)
 
                 # Create a batch to feed the discriminator model
@@ -603,7 +602,7 @@ class Pix2Pix(KerasModelWrapper):
                 avg_disc_loss += disc_loss
 
                 # Create a batch to feed the generator model
-                x_gen_target, x_gen = next(map_data_utils.random_batch(x_target, y_input_condition, self.batch_size))
+                x_gen_target, x_gen = next(self.dataset.generate_random_batch(self.batch_size, data_type="train"))
                 y_gen = np.zeros((x_gen.shape[0], 2), dtype=np.uint8)
                 y_gen[:, 1] = 1
 
@@ -615,14 +614,14 @@ class Pix2Pix(KerasModelWrapper):
                 self.discriminator.trainable = True
 
                 # Save images for visualization
-                if batch % (self.n_batch_per_epoch / 2) == 0:
-                    # Get new images from validation
-                    self.plot_generated_batch(x_full_batch, x_sketch_batch, "training",
-                                              epoch)
-                    x_full_batch, x_sketch_batch = next(
-                        map_data_utils.random_batch(x_full_val, x_sketch_val, self.batch_size))
-                    self.plot_generated_batch(x_full_batch, x_sketch_batch, "validation",
-                                              epoch)
+                # if batch % (self.n_batch_per_epoch / 2) == 0:
+                #     # Get new images from validation
+                #     self.plot_generated_batch(x_full_batch, x_sketch_batch, "training",
+                #                               epoch)
+                #     x_full_batch, x_sketch_batch = next(
+                #         map_data_utils.random_batch(x_target_val, y_input_condition_val, self.batch_size))
+                #     self.plot_generated_batch(x_full_batch, x_sketch_batch, "validation",
+                #                               epoch)
 
                 self.callback_manager.on_batch_end(batch, logs={"g_loss": gen_loss[0], "d_loss": disc_loss,
                                                                 "g_l1_loss": gen_loss[1], "g_log_loss": gen_loss[2],
