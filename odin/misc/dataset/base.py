@@ -65,8 +65,6 @@ class Dataset:
     source: str
     sample_shape: tuple
 
-    size: int
-
     def __init__(self,
                  whitening=False,
                  prompt=True, **kwargs):
@@ -74,7 +72,6 @@ class Dataset:
         self.whitening = whitening
         self.prompt = prompt
         self.args = kwargs
-        self.size = None
 
     def _extract_train(self):
         # type: () -> (list, list)
@@ -147,7 +144,7 @@ class Dataset:
         return train_data, train_labels, test_data, test_labels
 
     def generate_random_batch(self, batch_size, data_type="test"):
-        if data_type == "test":
+        if data_type == "test" or data_type == "validation":
             _, _, x, y = self.dataset
         else:
             x, y, _, _ = self.dataset
@@ -157,7 +154,7 @@ class Dataset:
             yield x[idx], y[idx]
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.dataset[0].shape[0]
 
 

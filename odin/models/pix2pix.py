@@ -1,6 +1,7 @@
+import os
+
 import keras.backend as K
 import numpy as np
-import os
 from keras.layers import Input, Concatenate
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import Conv2D, Deconv2D, UpSampling2D
@@ -9,10 +10,10 @@ from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
 
-from .keras_base import KerasModelWrapper
 import odin
-import odin.plot as oplt
 import odin.misc.dataset.map as map_data_utils
+import odin.plot as oplt
+from .keras_base import KerasModelWrapper
 
 
 def l1_loss(y_true, y_pred):
@@ -307,7 +308,7 @@ class Pix2Pix(KerasModelWrapper):
     model_name = "pix2pix_dcgan"
     dataset_name = "satellite_images"
 
-    def __init__(self, batch_size=100, bn_mode=False, use_mbd=False, label_flipping=0.01, label_smoothing=True,
+    def __init__(self, bn_mode=False, use_mbd=False, label_flipping=0.01, label_smoothing=True,
                  dummy=False, discriminator_weights="", generator_weights="",
                  **kwargs):
         """
@@ -320,18 +321,18 @@ class Pix2Pix(KerasModelWrapper):
         :param dummy: Use dummy data for faster debugging
         :param kwargs:
         """
-        self.batch_size = batch_size
-        self.generator_arch = kwargs["generator_architecture"]
+        self.batch_size = kwargs.get("batch_size", 100)
+        self.generator_arch = kwargs.get("generator_architecture", "deconv")
         self.image_data_format = "channels_last"
         self.img_shape = (256, 256, 3)
         self.patch_size = (64, 64)
         self.bn_mode = bn_mode
         self.use_mbd = use_mbd
-        self.do_plot = kwargs["plot"]
+        self.do_plot = kwargs.get("plot", True)
         self.n_batch_per_epoch = kwargs.get("n_batch_per_epoch", 10)
         self.label_smoothing = label_smoothing
         self.label_flipping = label_flipping
-        self.epochs = kwargs["epochs"]
+        self.epochs = kwargs.get("epochs", 100)
         self.dummy = dummy
 
         self.discriminator_weights = discriminator_weights
@@ -482,7 +483,7 @@ class Pix2Pix(KerasModelWrapper):
 
         disc_loss = self.discriminator.test_on_batch(x_disc, y_disc)
 
-        x_gen_target, x_gen = next(map_data_utils.random_batch(x_full_val, x_sketch_val, num))
+        x_gen_target, x_gen = next(self.dataset.generate_random_batch(num, data_type="test"))
         y_gen = np.zeros((x_gen.shape[0], 2), dtype=np.uint8)
         y_gen[:, 1] = 1
 
@@ -529,41 +530,30 @@ class Pix2Pix(KerasModelWrapper):
         xg = x_gen[:8]
         xr = x_target[:8]
 
-        # if self.image_data_format == "channels_last":
         x = np.concatenate((xs, xg, xr), axis=0)
-        list_rows = []
-        for i in range(int(x.shape[0] // 4)):
-            xr = np.concatenate([x[k] for k in range(4 * i, 4 * (i + 1))], axis=1)
-            list_rows.append(xr)
 
-        xr = np.concatenate(list_rows, axis=0)
+        rows = 6
+        cols = 4
 
-        # if self.image_data_format == "channels_first":
-        #     x = np.concatenate((xs, xg, xr), axis=0)
-        #     list_rows = []
-        #     for i in range(int(x.shape[0] // 4)):
-        #         xr = np.concatenate([x[k] for k in range(4 * i, 4 * (i + 1))], axis=2)
-        #         list_rows.append(xr)
-        #
-        #     xr = np.concatenate(list_rows, axis=1)
-        #     xr = xr.transpose((1, 2, 0))
+        fig = oplt.figure(figsize=(rows, cols))
 
-        columns = 4
-
-        oplt.figure()
-
-        for i, xs in enumerate(x):
-            oplt.subplot((i // columns, i % columns, i))
-
-            if xr.shape[-1] == 1:
-                oplt.imshow(xr[:, :, 0], cmap="gray")
+        gs1 = oplt.gridspec.GridSpec(rows, cols, figure=fig, wspace=0, hspace=0)
+        for i, xs in enumerate(x, start=0):
+            ax = oplt.subplot(gs1[i])
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_aspect('auto')
+            if xs.shape[-1] == 1:
+                ax.imshow(xs[:, :, 0], cmap="gray")
             else:
-                oplt.imshow(xr)
-        # oplt.axis("off")
-        oplt.savefig(odin.check_or_create_dir(self.model_path,
-                                              "figures",
-                                              file="{epoch}_current_batch_{suffix}.png".format(suffix=suffix,
-                                                                                               epoch=epoch)))
+                ax.imshow(xs)
+
+        oplt.savefig(
+            odin.check_or_create_dir(self.model_path,
+                                     "figures",
+                                     file="{epoch}_current_batch_{suffix}.png".format(suffix=suffix,
+                                                                                      epoch=epoch)))
+        oplt.show()
         oplt.clf()
         oplt.close()
 

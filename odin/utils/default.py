@@ -117,6 +117,10 @@ def default_arguments_and_behavior():
     co.update_args(args)
 
     np.random.seed(args.seed)
+
+    # Remove None values and use programmatic defaults
+    kwargs = {a: b for a, b in kwargs.items() if b is not None}
+
     prepare_logging(kwargs)
 
     odin.update_config(kwargs)
