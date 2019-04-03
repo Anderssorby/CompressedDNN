@@ -526,14 +526,15 @@ class Pix2Pix(KerasModelWrapper):
         x_target = map_data_utils.inverse_normalization(x_target)
         x_gen = map_data_utils.inverse_normalization(x_gen)
 
-        xs = y_condition[:8]
-        xg = x_gen[:8]
-        xr = x_target[:8]
+        rows = 6
+        cols = 6
+        subset = (rows * cols) // 3
+
+        xs = y_condition[:subset]
+        xg = x_gen[:subset]
+        xr = x_target[:subset]
 
         x = np.concatenate((xs, xg, xr), axis=0)
-
-        rows = 6
-        cols = 4
 
         fig = oplt.figure(figsize=(rows, cols))
 
