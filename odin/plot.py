@@ -1,11 +1,11 @@
 import os
-
 import matplotlib as mat
 if os.getenv("DISPLAY") is None:
     mat.use("Agg")
 
 from matplotlib import pyplot as plt
 from matplotlib.pyplot import *
+import matplotlib.gridspec as gridspec
 
 import odin
 from matplotlib import rc
