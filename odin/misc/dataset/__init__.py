@@ -1,5 +1,5 @@
 from odin.misc.dataset.base import Cifar10, MNIST, PTBWords, Mini
-from odin.misc.dataset.map import MapImageData
+from odin.misc.dataset.map import MapImageData, DOTA
 import numpy as np
 
 datasets = {
