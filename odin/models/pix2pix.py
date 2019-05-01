@@ -440,7 +440,7 @@ class Pix2Pix(KerasModelWrapper):
         info_lambda = 1.0
 
         loss_weights = [1E1, 1]
-        model.compile(loss=loss, loss_weights=loss_weights, regularizer=[vmir], optimizer=opt_dcgan)
+        model.compile(loss=loss, loss_weights=loss_weights, optimizer=opt_dcgan)
 
         self.discriminator.trainable = True
         self.discriminator.compile(loss='binary_crossentropy', optimizer=opt_discriminator)
@@ -456,7 +456,7 @@ class Pix2Pix(KerasModelWrapper):
         return dcgan
 
     def load_dataset(self):
-        dataset = map_data_utils.MapImageData()
+        dataset = map_data_utils.MapImageData(limit=self.dataset_limit)
         if self.dummy:
             dataset.load_dummy(self.batch_size * 2)
         else:

@@ -39,6 +39,7 @@ class ModelWrapper(ABC):
         self.args = kwargs
         self.prefix = kwargs.get('prefix', "default")
         self.verbose = kwargs.get("verbose", False)
+        self.dataset_limit = kwargs.get("dataset_limit", -1)
         self.dataset = self.load_dataset()
         if len(self.dataset) == 4:
             self.x_train, self.y_train, self.x_test, self.y_test = self.dataset
