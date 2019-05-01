@@ -7,12 +7,13 @@ datasets = {
     "mnist": MNIST,
     "ptb_words": PTBWords,
     "mini": Mini,
-    "satellite_images": MapImageData
+    "satellite_images": MapImageData,
+    "dota": DOTA
 }
 
 
 def load_dataset(name, options=None):
-    # type: (str, **dict) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
+    # type: (str, dict) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray)
     dataset = datasets[name](**options)
 
     return dataset.load()

@@ -36,22 +36,40 @@ def preprocessing(data):
     return components, mean, whiten
 
 
-def download_and_unwrap_tarball(source, name, force=False):
+def download_and_unwrap_tarball(source, name: str, force=False):
     """
 
     :param source: URL of interest
-    :param name:
+    :param name: filename to use
     :param force: Ignore the existence check
     :return: path to the extracted dir
     """
-    target_dir = os.path.join(data_dir, name)
+    spl = name.split(".", 1)
+    if len(spl) > 1:
+        base_name = spl[0]
+        extension = spl[1]
+        tar_file = name
+    else:
+        base_name = name
+        extension = "tar.gz"
+        tar_file = os.path.join(data_dir, name + "." + extension)
+
+    target_dir = os.path.join(data_dir, base_name)
     if os.path.isdir(target_dir) and not force:
         return target_dir
-    tar_file = os.path.join(data_dir, name + ".tar.gz")
-    logging.info("Downloading from %s to %s" % (source, target_dir))
-    check_call(["mkdir", "-p", target_dir])
-    check_call(["wget", "-N", source, "-O", tar_file])
-    check_call(["tar", "-zxvf", tar_file, "-C", data_dir])
+
+    if not os.path.isfile(tar_file):
+        logging.info("Downloading from %s to %s" % (source, target_dir))
+        check_call(["mkdir", "-p", target_dir])
+        check_call(["wget", "-N", source, "-O", tar_file])
+
+    if extension == "tar.gz":
+        check_call(["tar", "-zxvf", tar_file, "-C", data_dir])
+    elif extension == "zip":
+        check_call(["unzip", tar_file])
+    else:
+        raise ValueError("Unrecognized extension: " + extension)
+
     check_call(["rm", tar_file])
     return target_dir
 

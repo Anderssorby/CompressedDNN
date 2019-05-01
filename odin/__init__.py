@@ -5,9 +5,11 @@ Specifically it attempts to provide a common language for the different implemen
 """
 
 import os
+import yaml
 
-VERSION = 0.1
+VERSION = 0.2
 
+ODIN_CONFIG = os.getenv("ODIN_CONFIG", os.path.join(os.getcwd(), ".odin.yaml"))
 results_dir = os.getenv("ODIN_RESULTS_DIR", os.path.join(os.getcwd(), "results"))
 log_dir = os.path.join(os.getcwd(), "log")
 data_dir = os.path.join(os.getcwd(), "data")
@@ -76,6 +78,18 @@ def default_save_path(name, category="", experiment=None):
 
 def update_config(new_args):
     config.update(new_args)
+    return config
+
+
+def load_yaml_config(file):
+    if not os.path.isfile(file):
+        return None
+    stream = open(file, 'r')
+    y_config = yaml.load(stream, Loader=yaml.FullLoader)
+    return update_config(y_config)
+
+
+load_yaml_config(ODIN_CONFIG)
 
 print(ascii_logo)
 
@@ -84,4 +98,3 @@ import odin.actions
 import odin.compute
 import odin.utils
 import odin.callbacks
-

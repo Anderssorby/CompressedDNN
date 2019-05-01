@@ -8,10 +8,13 @@ using PyCall
 
 pushfirst!(PyVector(pyimport("sys")["path"]), "")
 
-@pyimport odin
-@pyimport odin.models as models
-@pyimport odin.utils.default as def
+models = pyimport("odin.models")
+def = pyimport("odin.utils.default")
+actions = pyimport("odin.actions")
 
-model_wrapper = models.load_model("mnist_vgg2")
+model_wrapper = models.load_model("pix2pix")
 #args, model_wrapper = def.default_chainer()
+
+actions.actions["train_model"]()
+
 

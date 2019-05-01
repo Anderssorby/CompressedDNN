@@ -378,6 +378,10 @@ class Pix2Pix(KerasModelWrapper):
         self.generator.compile(loss='mae', optimizer=opt_discriminator)
         self.discriminator.trainable = False
 
+        info_gan = False
+
+        latent_code_shape = 10
+
         gen_input = Input(shape=self.img_shape, name="DCGAN_input")
 
         generated_image = self.generator(gen_input)
@@ -426,8 +430,17 @@ class Pix2Pix(KerasModelWrapper):
                            show_layer_names=True)
 
         loss = [l1_loss, 'binary_crossentropy']
+
+        def variational_mutual_information_regularizer(c):
+            # L_I(G, Q) = \E_{x}[\E_{c'}[\log Q(c'|x)]] + H(c)
+
+            return K.mean()
+
+        vmir = variational_mutual_information_regularizer
+        info_lambda = 1.0
+
         loss_weights = [1E1, 1]
-        model.compile(loss=loss, loss_weights=loss_weights, optimizer=opt_dcgan)
+        model.compile(loss=loss, loss_weights=loss_weights, regularizer=[vmir], optimizer=opt_dcgan)
 
         self.discriminator.trainable = True
         self.discriminator.compile(loss='binary_crossentropy', optimizer=opt_discriminator)

@@ -121,39 +121,29 @@ def format_image(img_path, size, nb_channels):
     return img_full, img_sketch
 
 
-def build_hdf5(size=256):
+def build_hdf5(source, name="maps", file_name="maps_data.h5", size=256):
     """
     Gather the data in a single HDF5 file.
     """
-    # Put train data in HDF5
-    file_name = "maps"
     pro_data_dir = odin.check_or_create_dir(odin.data_dir)
 
-    hdf5_file = os.path.join(pro_data_dir, "%s_data.h5" % file_name)
+    hdf5_file = os.path.join(pro_data_dir, file_name)
 
     if os.path.isfile(hdf5_file):
         return hdf5_file
 
-    # from keras.utils.data_utils import get_file
-    # path = get_file("maps.tar.gz",
-    #                origin='http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/maps.tar.gz',
-    #                file_hash="7519044b2725f55bc80e5a3db5d6f64f767a7b76421098c364c432ec82faf275",
-    #                extract=True)
-
-    path = download_and_unwrap_tarball(source='http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/maps.tar.gz',
-                                       name="maps")
+    path = download_and_unwrap_tarball(source=source,
+                                       name=name)
 
     nb_channels = 3
-    jpeg_dir = path
 
     with h5py.File(hdf5_file, "w") as hfw:
 
         for dset_type in ["train", "test", "val"]:
 
-            list_img = [img for img in Path(jpeg_dir).glob('%s/*.jpg' % dset_type)]
+            list_img = [img for img in Path(path).glob('%s/*.jpg' % dset_type)]
             list_img = [str(img) for img in list_img]
-            list_img.extend(list(Path(jpeg_dir).glob('%s/*.png' % dset_type)))
-            list_img = list(map(str, list_img))
+            list_img.extend(map(str, Path(path).glob('%s/*.png' % dset_type)))
             list_img = np.array(list_img)
 
             num_files = len(list_img)
@@ -190,7 +180,7 @@ def build_hdf5(size=256):
                 data_sketch[-arr_img_sketch.shape[0]:] = arr_img_sketch.astype(np.uint8)
 
         # Plot result
-        check_hdf5(jpeg_dir, nb_channels)
+        check_hdf5(path, nb_channels)
 
     return hdf5_file
 
@@ -238,7 +228,7 @@ class MapImageData(Dataset):
         image_data_format = "channels_last"
         limit = self.limit
 
-        path = build_hdf5()
+        path = build_hdf5(source='http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/maps.tar.gz')
 
         with h5py.File(path, "r") as hf:
             print("File loaded")
@@ -279,3 +269,27 @@ class MapImageData(Dataset):
             self.dataset = x_target, y_input_condition, x_target_val, y_input_condition_val
 
             return self.dataset
+
+
+class DOTA(Dataset):
+    """
+    DOTA-v1.5
+    """
+
+    name = "dota"
+    source = "https://data.sorby.xyz/DOTA-v1.5_train.zip"
+
+    def __init__(self):
+        super(DOTA, self).__init__()
+        f = "DOTA-v1.5_train.h5"
+        # file_name = os.path.join(odin.data_dir, f)
+        path = build_hdf5(name="dota", file_name=f, size=256, source=self.source)
+        limit = -1
+
+        with h5py.File(path, "r") as hf:
+            print("File loaded")
+
+            x_train = hf["train_data_full"][:limit].astype(np.float32)
+            x_train = normalization(x_train)
+
+

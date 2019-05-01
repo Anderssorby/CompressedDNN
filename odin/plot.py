@@ -11,8 +11,9 @@ import odin
 from matplotlib import rc
 
 # Use LaTex
-rc('text', usetex=True)
-rc('font', family='serif')
+if odin.config.get("use_latex", True):
+    rc('text', usetex=True)
+    rc('font', family='serif')
 
 
 def plot_eigen_values(eigen_values, title=""):
