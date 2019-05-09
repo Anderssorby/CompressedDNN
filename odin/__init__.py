@@ -84,9 +84,14 @@ def update_config(new_args):
 
 def load_yaml_config(file):
     if not os.path.isfile(file):
-        return None
+        raise ValueError(file + " is not a file.")
+
     stream = open(file, 'r')
-    y_config = yaml.load(stream, Loader=yaml.FullLoader)
+    # For compatibility with older versions of pyyaml
+    if hasattr(yaml, "FullLoader"):
+        y_config = yaml.load(stream, Loader=yaml.FullLoader)
+    else:
+        y_config = yaml.load(stream)
     return update_config(y_config)
 
 

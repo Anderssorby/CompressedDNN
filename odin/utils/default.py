@@ -108,10 +108,7 @@ def default_arguments_and_behavior():
     kwargs = vars(args)
 
     if args.config:
-        if not os.path.isfile(args.config):
-            raise ValueError(args.config + " is not a file.")
-        stream = open(args.config, 'r')
-        config = yaml.load(stream, Loader=yaml.FullLoader)
+        config = odin.load_yaml_config(args.config)
         kwargs.update(config)
 
     co.update_args(args)
