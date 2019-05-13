@@ -74,11 +74,11 @@ class GANSampler(TrainingCallback):
 
             dataset = self.model_wrapper.dataset
             x_target, y_input_condition = next(
-                dataset.generate_random_batch(self.batch_size, data_type="train"))
+                dataset.random_batch_generator(self.batch_size, data_type="train"))
             self.model_wrapper.plot_generated_batch(x_target, y_input_condition, "training",
                                                     epoch)
             x_full_batch, x_sketch_batch = next(
-                dataset.generate_random_batch(self.batch_size, data_type="test"))
+                dataset.random_batch_generator(self.batch_size, data_type="test"))
             self.model_wrapper.plot_generated_batch(x_full_batch, x_sketch_batch, "validation",
                                                     epoch)
 

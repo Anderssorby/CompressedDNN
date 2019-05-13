@@ -6,6 +6,7 @@
 #SBATCH --output=mnist-wgan.out
 #SBATCH --mail-user=anderscs@stud.ntnu.no
 #SBATCH --mail-type=ALL
+#SBATCH --mem=12000
 # For using GPU
 #SBATCH --partition=EPICALL
 #SBATCH --nodes=1

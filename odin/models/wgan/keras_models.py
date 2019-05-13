@@ -150,7 +150,7 @@ class WGANKerasWrapper(KerasModelWrapper):
         self.discriminator.compile(loss=self.wasserstein_loss,
                                    optimizer=self.optimizer,
                                    metrics=['accuracy'])
-        # The generator takes noise as input and generated imgs
+        # The generator takes noise as input
         z = Input(shape=self.latent_dim, name="combined_input")
         img = self.generator(z)
 

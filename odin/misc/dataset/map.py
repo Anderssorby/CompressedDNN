@@ -121,7 +121,7 @@ def format_image(img_path, size, nb_channels):
     return img_full, img_sketch
 
 
-def build_hdf5(source, name="maps", file_name="maps_data.h5", size=256):
+def build_hdf5(source, name="maps", file_name="maps_data.h5", size=256, max_samples=None):
     """
     Gather the data in a single HDF5 file.
     """
@@ -153,12 +153,12 @@ def build_hdf5(source, name="maps", file_name="maps_data.h5", size=256):
 
             data_full = hfw.create_dataset("%s_data_full" % dset_type,
                                            (0, nb_channels, size, size),
-                                           maxshape=(None, 3, size, size),
+                                           maxshape=(max_samples, 3, size, size),
                                            dtype=np.uint8)
 
             data_sketch = hfw.create_dataset("%s_data_sketch" % dset_type,
                                              (0, nb_channels, size, size),
-                                             maxshape=(None, 3, size, size),
+                                             maxshape=(max_samples, 3, size, size),
                                              dtype=np.uint8)
 
             chunk_size = 100
@@ -214,6 +214,7 @@ def check_hdf5(jpeg_dir, nb_channels):
 
 class MapImageData(Dataset):
     name = "satellite_images"
+    source = 'http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/maps.tar.gz'
 
     sample_shape = (256, 256, 3)
 
@@ -228,7 +229,7 @@ class MapImageData(Dataset):
         image_data_format = "channels_last"
         limit = self.limit
 
-        path = build_hdf5(source='http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/maps.tar.gz')
+        path = build_hdf5(source=self.source)
 
         with h5py.File(path, "r") as hf:
             print("File loaded")
@@ -291,5 +292,82 @@ class DOTA(Dataset):
 
             x_train = hf["train_data_full"][:limit].astype(np.float32)
             x_train = normalization(x_train)
+
+
+class TanzaniaBuildingFootprint(Dataset):
+    """
+    2018 Open AI Tanzania Building Footprint Segmentation Challenge
+    https://competitions.codalab.org/competitions/20100
+    """
+    sources = {
+        "train": {
+            "GeoJSON": [  # object segments
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AAARCAOqhcRdoU7ULOb9GJl9a/grid_001.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AADtSLtWlp1WWBzok4j8QDtTa/grid_022.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AAAvAgdJLgURi6y0V_R7b77Na/grid_023.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AAAQlsJdp4WYiUwfd0o4mqoNa/grid_028.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AADHytc8fSCf3gna0wNAW3lZa/grid_029.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AADsRwTo35luDWb4FcKhAotaa/grid_035.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AABX9puJlaKE25JJ9YAkF-Bta/grid_036.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AACAIX76YnY7YF-qqJ_4NBPwa/grid_042.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AADYKa21pfgqygaPI7-k_Gp7a/grid_043.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AADTfD4iO7iShsBU_DI3vsaga/grid_049.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AABBphDWEHz71zdoeNYRAyeha/grid_050.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AACjRwga-dJY1dud1Kfq64Fsa/grid_051.geojson?dl=0",
+                "https://www.dropbox.com/sh/ct3s1x2a846x3yl/AADY5M0XSZphjFNfwmFli_baa/grid_058.geojson?dl=0",
+            ],
+            "GeiTIFF": [  # Image data
+                "https://oin-hotosm.s3.amazonaws.com/5afeda152b6a08001185f11a/0/5afeda152b6a08001185f11b.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae242fd0b093000130afd26/0/5ae242fd0b093000130afd27.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae242fd0b093000130afd46/0/5ae242fd0b093000130afd47.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae242fd0b093000130afd34/0/5ae242fd0b093000130afd35.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae242fd0b093000130afd38/0/5ae242fd0b093000130afd39.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae242fd0b093000130afd42/0/5ae242fd0b093000130afd43.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae242fd0b093000130afd40/0/5ae242fd0b093000130afd41.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd64/0/5ae318220b093000130afd65.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd6a/0/5ae318220b093000130afd6b.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd62/0/5ae318220b093000130afd63.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd92/0/5ae318220b093000130afd93.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd70/0/5ae318220b093000130afd71.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd7c/0/5ae318220b093000130afd7d.tif"
+            ]
+        },
+        "test": {
+            "GeoTIFF": [
+                "https://oin-hotosm.s3.amazonaws.com/5ae242fd0b093000130afd32/0/5ae242fd0b093000130afd33.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5b00370f2b6a08001185f125/3/5b00370f2b6a08001185f129.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd98/0/5ae318220b093000130afd99.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5b00370f2b6a08001185f125/5/5b00370f2b6a08001185f12b.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae36dd70b093000130afdba/0/5ae36dd70b093000130afdbb.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae38a540b093000130aff23/0/5ae38a540b093000130aff24.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae38a540b093000130afecf/0/5ae38a540b093000130afed0.tif"
+            ]},
+        "validate": {
+            "GeoTIFF": [
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd78/0/5ae318220b093000130afd79.tif",
+                "https://oin-hotosm.s3.amazonaws.com/5ae318220b093000130afd94/0/5ae318220b093000130afd95.tif"
+            ]
+        }
+    }
+
+    def __init__(self, limit=-1):
+        super(TanzaniaBuildingFootprint, self).__init__()
+
+        x_source = self.sources["train"]["GeoTIFF"][2]
+        y_source = self.sources["train"]["GeoJSON"][2]
+
+        file_name = "tanzania_building_footprint.h5"
+
+        hdf5_file = os.path.join(odin.data_dir, file_name)
+
+        if not os.path.isfile(hdf5_file):
+
+            download_and_unwrap_tarball()
+            path = build_hdf5(x_source)
+
+        with h5py.File(hdf5_file, "r") as hf:
+            print("File loaded")
+
+            x_train = hf["train_x"][:limit].astype(np.float32)
 
 

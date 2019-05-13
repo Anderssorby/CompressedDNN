@@ -36,6 +36,13 @@ def preprocessing(data):
     return components, mean, whiten
 
 
+def download_if_necessary(source, tar_file, target_dir):
+    if not os.path.isfile(tar_file):
+        logging.info("Downloading from %s to %s" % (source, target_dir))
+        check_call(["mkdir", "-p", target_dir])
+        check_call(["wget", "-N", source, "-O", tar_file])
+
+
 def download_and_unwrap_tarball(source, name: str, force=False):
     """
 
@@ -48,7 +55,7 @@ def download_and_unwrap_tarball(source, name: str, force=False):
     if len(spl) > 1:
         base_name = spl[0]
         extension = spl[1]
-        tar_file = name
+        tar_file = os.path.join(data_dir, name)
     else:
         base_name = name
         extension = "tar.gz"
@@ -56,12 +63,10 @@ def download_and_unwrap_tarball(source, name: str, force=False):
 
     target_dir = os.path.join(data_dir, base_name)
     if os.path.isdir(target_dir) and not force:
+        # It is already extracted
         return target_dir
 
-    if not os.path.isfile(tar_file):
-        logging.info("Downloading from %s to %s" % (source, target_dir))
-        check_call(["mkdir", "-p", target_dir])
-        check_call(["wget", "-N", source, "-O", tar_file])
+    download_if_necessary(source, tar_file, target_dir)
 
     if extension == "tar.gz":
         check_call(["tar", "-zxvf", tar_file, "-C", data_dir])
@@ -161,7 +166,7 @@ class Dataset:
 
         return train_data, train_labels, test_data, test_labels
 
-    def generate_random_batch(self, batch_size, data_type="test"):
+    def random_batch_generator(self, batch_size, data_type="test"):
         if data_type == "test" or data_type == "validation":
             _, _, x, y = self.dataset
         else:

@@ -32,33 +32,7 @@ def lambda_output(input_shape):
     return input_shape[:2]
 
 
-# def conv_block_unet(x, f, name, bn_mode, bn_axis, bn=True, dropout=False, strides=(2,2)):
-
-#     x = Conv2D(f, (3, 3), strides=strides, name=name, padding="same")(x)
-#     if bn:
-#         x = BatchNormalization(axis=bn_axis)(x)
-#     x = LeakyReLU(0.2)(x)
-#     if dropout:
-#         x = Dropout(0.5)(x)
-
-#     return x
-
-
-# def up_conv_block_unet(x1, x2, f, name, bn_mode, bn_axis, bn=True, dropout=False):
-
-#     x1 = UpSampling2D(size=(2, 2))(x1)
-#     x = merge([x1, x2], mode="concat", concat_axis=bn_axis)
-
-#     x = Conv2D(f, (3, 3), name=name, padding="same")(x)
-#     if bn:
-#         x = BatchNormalization(axis=bn_axis)(x)
-#     x = Activation("relu")(x)
-#     if dropout:
-#         x = Dropout(0.5)(x)
-
-#     return x
-
-def conv_block_unet(x, f, name, bn_mode, bn_axis, bn=True, strides=(2, 2)):
+def conv_block_unet(x, f, bn_axis, bn=True, strides=(2, 2), name=""):
     x = LeakyReLU(0.2)(x)
     x = Conv2D(f, (3, 3), strides=strides, name=name, padding="same")(x)
     if bn:
@@ -67,7 +41,7 @@ def conv_block_unet(x, f, name, bn_mode, bn_axis, bn=True, strides=(2, 2)):
     return x
 
 
-def up_conv_block_unet(x, x2, f, name, bn_mode, bn_axis, bn=True, dropout=False):
+def up_conv_block_unet(x, x2, f, bn_axis, bn=True, dropout=False, name=""):
     x = Activation("relu")(x)
     x = UpSampling2D(size=(2, 2))(x)
     x = Conv2D(f, (3, 3), name=name, padding="same")(x)
@@ -80,10 +54,9 @@ def up_conv_block_unet(x, x2, f, name, bn_mode, bn_axis, bn=True, dropout=False)
     return x
 
 
-def deconv_block_unet(x, x2, f, h, w, batch_size, name, bn_mode, bn_axis, bn=True, dropout=False):
-    o_shape = (batch_size, h * 2, w * 2, f)
+def deconv_block_unet(x, x2, f, bn_axis, bn=True, dropout=False, name=""):
     x = Activation("relu")(x)
-    x = Deconv2D(f, (3, 3), strides=(2, 2), padding="same")(x)
+    x = Deconv2D(f, (3, 3), strides=(2, 2), padding="same", name=name)(x)
     if bn:
         x = BatchNormalization(axis=bn_axis)(x)
     if dropout:
@@ -94,7 +67,7 @@ def deconv_block_unet(x, x2, f, h, w, batch_size, name, bn_mode, bn_axis, bn=Tru
 
 
 class Generator(Model):
-    def __init__(self, img_dim, bn_mode, batch_size, architecture="upsampling"):
+    def __init__(self, img_dim, architecture="upsampling"):
         unet_input = Input(shape=img_dim, name="unet_input")
 
         if architecture == "upsampling":
@@ -116,9 +89,9 @@ class Generator(Model):
             # Encoder
             list_encoder = [Conv2D(list_nb_filters[0], (3, 3),
                                    strides=(2, 2), name="unet_conv2D_1", padding="same")(unet_input)]
-            for i, f in enumerate(list_nb_filters[1:]):
+            for i, filters in enumerate(list_nb_filters[1:]):
                 name = "unet_conv2D_%s" % (i + 2)
-                conv = conv_block_unet(list_encoder[-1], f, name, bn_mode, bn_axis)
+                conv = conv_block_unet(list_encoder[-1], filters, bn_axis, name=name)
                 list_encoder.append(conv)
 
             # Prepare decoder filters
@@ -128,16 +101,12 @@ class Generator(Model):
 
             # Decoder
             list_decoder = [up_conv_block_unet(list_encoder[-1], list_encoder[-2],
-                                               list_nb_filters[0], "unet_upconv2D_1", bn_mode, bn_axis, dropout=True)]
-            for i, f in enumerate(list_nb_filters[1:]):
+                                               list_nb_filters[0], bn_axis, dropout=True, name="unet_upconv2D_1")]
+            for i, filters in enumerate(list_nb_filters[1:]):
                 name = "unet_upconv2D_%s" % (i + 2)
                 # Dropout only on first few layers
-                if i < 2:
-                    d = True
-                else:
-                    d = False
-                conv = up_conv_block_unet(list_decoder[-1], list_encoder[-(i + 3)], f, name, bn_mode, bn_axis,
-                                          dropout=d)
+                conv = up_conv_block_unet(list_decoder[-1], list_encoder[-(i + 3)], filters, bn_axis,
+                                          dropout=i < 2, name=name)
                 list_decoder.append(conv)
 
             x = Activation("relu")(list_decoder[-1])
@@ -149,7 +118,7 @@ class Generator(Model):
 
             nb_filters = 64
             bn_axis = -1
-            h, w, nb_channels = img_dim
+            nb_channels = img_dim[-1]
             min_s = min(img_dim[:-1])
 
             # Prepare encoder filters
@@ -160,12 +129,10 @@ class Generator(Model):
             list_encoder = [Conv2D(list_nb_filters[0], (3, 3),
                                    strides=(2, 2), name="unet_conv2D_1", padding="same")(unet_input)]
             # update current "image" h and w
-            h, w = h / 2, w / 2
-            for i, f in enumerate(list_nb_filters[1:]):
+            for i, filters in enumerate(list_nb_filters[1:]):
                 name = "unet_conv2D_%s" % (i + 2)
-                conv = conv_block_unet(list_encoder[-1], f, name, bn_mode, bn_axis)
+                conv = conv_block_unet(list_encoder[-1], filters, bn_axis, name=name)
                 list_encoder.append(conv)
-                h, w = h / 2, w / 2
 
             # Prepare decoder filters
             list_nb_filters = list_nb_filters[:-1][::-1]
@@ -174,23 +141,16 @@ class Generator(Model):
 
             # Decoder
             list_decoder = [deconv_block_unet(list_encoder[-1], list_encoder[-2],
-                                              list_nb_filters[0], h, w, batch_size,
-                                              "unet_upconv2D_1", bn_mode, bn_axis, dropout=True)]
-            h, w = h * 2, w * 2
-            for i, f in enumerate(list_nb_filters[1:]):
+                                              list_nb_filters[0], bn_axis, dropout=True, name="unet_upconv2D_1")]
+            for i, filters in enumerate(list_nb_filters[1:]):
                 name = "unet_upconv2D_%s" % (i + 2)
                 # Dropout only on first few layers
-                if i < 2:
-                    d = True
-                else:
-                    d = False
-                conv = deconv_block_unet(list_decoder[-1], list_encoder[-(i + 3)], f, h,
-                                         w, batch_size, name, bn_mode, bn_axis, dropout=d)
+                conv = deconv_block_unet(list_decoder[-1], list_encoder[-(i + 3)], filters, bn_axis, dropout=i < 2,
+                                         name=name)
                 list_decoder.append(conv)
-                h, w = h * 2, w * 2
 
             x = Activation("relu")(list_decoder[-1])
-            o_shape = (batch_size,) + img_dim
+            # o_shape = (batch_size,) + img_dim
             x = Deconv2D(nb_channels, (3, 3), strides=(2, 2), padding="same")(x)
             x = Activation("tanh")(x)
         else:
@@ -201,7 +161,7 @@ class Generator(Model):
 
 class DCGANDiscriminator(Model):
 
-    def __init__(self, img_dim, nb_patch, bn_mode, model_name="DCGAN_discriminator", use_mbd=True):
+    def __init__(self, img_dim, nb_patch, model_name="DCGAN_discriminator", use_mbd=True):
         """
         Discriminator model of the DCGAN
 
@@ -265,6 +225,23 @@ class DCGANDiscriminator(Model):
             x_mbd = MBD(x_mbd)
             x = Concatenate(axis=bn_axis)([x, x_mbd])
 
+        h, w, _ = img_dim
+        aux_param = Dense(2*h*w, activation="softmax", name="auxiliary_dist")(x)
+        self.auxiliary = Model(inputs=list_input, outputs=aux_param, name="auxiliary_dist")
+
+        def vmir(code, y_pred):
+            """
+
+            :param code: The code batch we are learning
+            :param y_pred:
+            :return:
+            """
+            pred_dist = stats.norm(loc=y_pred[:h*w], scale=y_pred[h*w:2*h*w])
+            samples = [pred_dist.pdf(c) for c in code]
+            return K.mean(samples)
+
+        self.auxiliary.compile(Adam(), loss=vmir)
+
         x_out = Dense(2, activation="softmax", name="disc_output")(x)
 
         super(DCGANDiscriminator, self).__init__(inputs=list_input, outputs=[x_out], name=model_name)
@@ -309,7 +286,7 @@ class Pix2Pix(KerasModelWrapper):
     dataset_name = "satellite_images"
 
     def __init__(self, bn_mode=False, use_mbd=False, label_flipping=0.01, label_smoothing=True,
-                 dummy=False, discriminator_weights="", generator_weights="",
+                 dummy=False, discriminator_weights="", generator_weights="", info_gan=False,
                  **kwargs):
         """
 
@@ -334,6 +311,9 @@ class Pix2Pix(KerasModelWrapper):
         self.label_flipping = label_flipping
         self.epochs = kwargs.get("epochs", 100)
         self.dummy = dummy
+        self.info_gan = info_gan
+
+        self.latent_code_shape = 10
 
         self.discriminator_weights = discriminator_weights
         self.generator_weights = generator_weights
@@ -361,7 +341,12 @@ class Pix2Pix(KerasModelWrapper):
         self.n_batch_per_epoch = min(steps_per_epoch, self.n_batch_per_epoch)
 
     def construct(self):
-
+        if self.info_gan:
+            # Add an extra code channel
+            h, w, c = self.img_shape
+            gen_input_shape = (h, w, c + 1)
+        else:
+            gen_input_shape = self.img_shape
         # Get the number of non overlapping patch and the size of input image to the discriminator
         nb_patch, img_dim_disc = map_data_utils.get_nb_patch(self.img_shape, self.patch_size, self.image_data_format)
 
@@ -371,18 +356,15 @@ class Pix2Pix(KerasModelWrapper):
         opt_discriminator = Adam(lr=1E-3, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
         # Load generator model
-        self.generator = Generator(self.img_shape, self.bn_mode, self.batch_size, architecture=self.generator_arch)
+        self.generator = Generator(gen_input_shape, architecture=self.generator_arch)
         # Load discriminator model
-        self.discriminator = DCGANDiscriminator(img_dim_disc, nb_patch, self.bn_mode, use_mbd=self.use_mbd)
+        self.discriminator = DCGANDiscriminator(img_dim_disc, nb_patch, use_mbd=self.use_mbd)
+
 
         self.generator.compile(loss='mae', optimizer=opt_discriminator)
         self.discriminator.trainable = False
 
-        info_gan = False
-
-        latent_code_shape = 10
-
-        gen_input = Input(shape=self.img_shape, name="DCGAN_input")
+        gen_input = Input(shape=gen_input_shape, name="DCGAN_input")
 
         generated_image = self.generator(gen_input)
 
@@ -397,12 +379,12 @@ class Pix2Pix(KerasModelWrapper):
         list_col_idx = [(i * pw, (i + 1) * pw) for i in range(w // pw)]
 
         list_gen_patch = []
-        for row_idx in list_row_idx:
-            for col_idx in list_col_idx:
+        for r1, r2 in list_row_idx:
+            for c1, c2 in list_col_idx:
                 if self.image_data_format == "channels_last":
-                    x_patch = Lambda(lambda z: z[:, row_idx[0]:row_idx[1], col_idx[0]:col_idx[1], :])(generated_image)
+                    x_patch = Lambda(lambda z: z[:, r1:r2, c1:c2, :])(generated_image)
                 else:
-                    x_patch = Lambda(lambda z: z[:, :, row_idx[0]:row_idx[1], col_idx[0]:col_idx[1]])(generated_image)
+                    x_patch = Lambda(lambda z: z[:, :, r1:r2, c1:c2])(generated_image)
                 list_gen_patch.append(x_patch)
 
         output = self.discriminator(list_gen_patch)
@@ -431,12 +413,7 @@ class Pix2Pix(KerasModelWrapper):
 
         loss = [l1_loss, 'binary_crossentropy']
 
-        def variational_mutual_information_regularizer(c):
-            # L_I(G, Q) = \E_{x}[\E_{c'}[\log Q(c'|x)]] + H(c)
 
-            return K.mean()
-
-        vmir = variational_mutual_information_regularizer
         info_lambda = 1.0
 
         loss_weights = [1E1, 1]
@@ -496,7 +473,7 @@ class Pix2Pix(KerasModelWrapper):
 
         disc_loss = self.discriminator.test_on_batch(x_disc, y_disc)
 
-        x_gen_target, x_gen = next(self.dataset.generate_random_batch(num, data_type="test"))
+        x_gen_target, x_gen = next(self.dataset.random_batch_generator(num, data_type="test"))
         y_gen = np.zeros((x_gen.shape[0], 2), dtype=np.uint8)
         y_gen[:, 1] = 1
 
@@ -592,7 +569,7 @@ class Pix2Pix(KerasModelWrapper):
             avg_disc_loss = 0
 
             for batch, (x_full_batch, x_sketch_batch) in enumerate(
-                    self.dataset.generate_random_batch(self.batch_size, data_type="train"), start=1):
+                    self.dataset.random_batch_generator(self.batch_size, data_type="train"), start=1):
                 self.callback_manager.on_batch_begin(batch)
 
                 # Create a batch to feed the discriminator model
@@ -606,14 +583,24 @@ class Pix2Pix(KerasModelWrapper):
                 avg_disc_loss += disc_loss
 
                 # Create a batch to feed the generator model
-                x_gen_target, x_gen = next(self.dataset.generate_random_batch(self.batch_size, data_type="train"))
+                x_gen_target, x_gen = next(self.dataset.random_batch_generator(self.batch_size, data_type="train"))
                 y_gen = np.zeros((x_gen.shape[0], 2), dtype=np.uint8)
                 y_gen[:, 1] = 1
+
+                if self.info_gan:
+                    # Sample code
+                    code = np.random.uniform(0, 1, self.img_shape[:-2])
+                    x_gen = np.concatenate(x_gen, code, axis=2)
 
                 # Freeze the discriminator
                 self.discriminator.trainable = False
                 gen_loss = self.model.train_on_batch(x_gen, [x_gen_target, y_gen])
                 avg_gen_loss += gen_loss[0]
+                # Train the auxiliary
+                if self.info_gan:
+                    gen_loss = self.discriminator.auxiliary.train_on_batch(x_gen, [x_gen_target, code])
+                    # self.variational_mutual_information_regularizer(code, x_gen)
+
                 # Unfreeze the discriminator
                 self.discriminator.trainable = True
 
